@@ -1,0 +1,5041 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MICRO CITY / 02 — 微缩城市试验场</title>
+  <style>
+    :root {
+      --paper: #ded9cf;
+      --ink: #181816;
+      --muted: rgba(24, 24, 22, 0.48);
+      --hairline: rgba(24, 24, 22, 0.14);
+      --panel: rgba(255, 255, 255, 0.48);
+      --mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+      --sans: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+      --ease: cubic-bezier(0.22, 0.8, 0.24, 1);
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #scene {
+      position: fixed;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+      touch-action: none;
+    }
+
+    .vignette {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 80% 74% at 50% 45%, transparent 48%, rgba(70, 66, 58, 0.10) 100%),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.18), transparent 24%);
+      mix-blend-mode: multiply;
+    }
+
+    header {
+      position: fixed;
+      top: 30px;
+      left: 34px;
+      z-index: 4;
+      pointer-events: none;
+      user-select: none;
+      max-width: min(760px, calc(100vw - 150px));
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 13px;
+      color: var(--muted);
+      font: 500 10px/1 var(--mono);
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 22px;
+      height: 1px;
+      background: var(--ink);
+      opacity: 0.36;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 3vw, 38px);
+      font-weight: 400;
+      line-height: 0.94;
+      letter-spacing: -0.045em;
+    }
+
+    h1 span {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 400;
+      letter-spacing: 0.12em;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px 16px;
+      margin-top: 21px;
+      color: var(--muted);
+      font: 500 9.5px/1.45 var(--mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .meta b {
+      color: var(--ink);
+      font-weight: 500;
+    }
+
+    .meta .dot {
+      width: 3px;
+      height: 3px;
+      flex: none;
+      border-radius: 50%;
+      background: var(--ink);
+      opacity: 0.28;
+    }
+
+    .seed-label {
+      position: fixed;
+      top: 33px;
+      right: 34px;
+      z-index: 4;
+      color: var(--muted);
+      font: 500 9.5px/1 var(--mono);
+      letter-spacing: 0.10em;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .seed-label b {
+      color: var(--ink);
+      font-weight: 500;
+    }
+
+    .population-panel {
+      position: fixed;
+      top: 190px;
+      left: 34px;
+      z-index: 7;
+      width: 224px;
+      padding: 16px 17px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      border-radius: 16px;
+      background: rgba(22, 22, 20, 0.88);
+      color: #f7f5ef;
+      box-shadow: 0 18px 50px rgba(33, 30, 24, 0.16);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      pointer-events: auto;
+      cursor: grab;
+      touch-action: none;
+      will-change: transform;
+      user-select: none;
+      transition: box-shadow 180ms var(--ease);
+    }
+
+    .population-panel.dragging {
+      z-index: 9;
+      cursor: grabbing;
+      box-shadow: 0 24px 65px rgba(33, 30, 24, 0.24);
+    }
+
+    .population-grip {
+      position: absolute;
+      top: 15px;
+      right: 14px;
+      display: grid;
+      grid-template-columns: repeat(2, 3px);
+      grid-auto-rows: 3px;
+      gap: 3px;
+      opacity: 0.28;
+    }
+
+    .population-grip i {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: #ffffff;
+    }
+
+    .population-kicker {
+      display: block;
+      color: rgba(255, 255, 255, 0.45);
+      font: 500 8.5px/1 var(--mono);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .population-total {
+      display: block;
+      margin-top: 7px;
+      color: #ffffff;
+      font: 500 24px/1 var(--mono);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.04em;
+    }
+
+    .population-metrics {
+      display: flex;
+      flex-direction: column;
+      margin-top: 13px;
+    }
+
+    .population-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.10);
+    }
+
+    .population-row + .population-row { margin-top: 7px; }
+
+    .population-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      opacity: 0.64;
+      font: 500 10px/1.2 var(--sans);
+      letter-spacing: 0.08em;
+      white-space: nowrap;
+    }
+
+    .population-label::before {
+      content: "";
+      width: 4px;
+      height: 4px;
+      flex: none;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .population-row b {
+      font: 500 14px/1 var(--mono);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+    }
+
+    .population-row.alive { color: #ffffff; }
+    .population-row.injured { color: #f4c552; }
+    .population-row.dead { color: #ef5b50; }
+
+    /* ---------------------------- nuclear HUD ---------------------------- */
+
+    .nuke-panel {
+      position: fixed;
+      top: 190px;
+      right: 34px;
+      z-index: 7;
+      width: 292px;
+      max-height: calc(100vh - 270px);
+      overflow-y: auto;
+      padding: 16px;
+      border: 1px solid var(--hairline);
+      border-radius: 16px;
+      background: rgba(250, 248, 243, 0.78);
+      box-shadow: 0 18px 55px rgba(45, 40, 32, 0.12);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(24, 24, 22, 0.2) transparent;
+    }
+
+    .nuke-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .nuke-kicker {
+      display: block;
+      color: var(--muted);
+      font: 500 8.5px/1 var(--mono);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .nuke-title {
+      display: block;
+      margin-top: 7px;
+      color: var(--ink);
+      font: 500 16px/1.1 var(--sans);
+      letter-spacing: -0.02em;
+    }
+
+    .nuke-head-side {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-top: 1px;
+    }
+
+    .nuke-status {
+      color: var(--muted);
+      font: 500 8.5px/1 var(--mono);
+      letter-spacing: 0.09em;
+      white-space: nowrap;
+    }
+
+    .nuke-status.live { color: #1f63e8; }
+    .nuke-status.paused { color: #b27b19; }
+
+    .nuke-close {
+      display: none;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 1px solid var(--hairline);
+      border-radius: 50%;
+      background: transparent;
+      color: var(--ink);
+      font: 400 16px/1 var(--sans);
+      cursor: pointer;
+    }
+
+    .nuke-field { margin-top: 15px; }
+
+    .warhead-block {
+      margin-top: 11px;
+      padding-top: 9px;
+      border-top: 1px solid rgba(24, 24, 22, 0.10);
+    }
+
+    .warhead-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font: 500 8.5px/1 var(--mono);
+      letter-spacing: 0.08em;
+    }
+
+    .warhead-head b {
+      color: var(--ink);
+      font: 600 9px/1 var(--mono);
+      letter-spacing: 0.02em;
+    }
+
+    .warhead-list {
+      display: grid;
+      gap: 2px;
+      max-height: 160px;
+      margin-top: 6px;
+      overflow-y: auto;
+      padding-right: 2px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(24, 24, 22, 0.18) transparent;
+    }
+
+    .warhead-row {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      min-height: 22px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.28);
+      overflow: hidden;
+    }
+
+    .warhead-row.selected {
+      border-color: rgba(47, 111, 237, 0.22);
+      background: rgba(47, 111, 237, 0.07);
+    }
+
+    .warhead-pick {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      height: 22px;
+      flex: 1;
+      padding: 0 6px;
+      border: 0;
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .warhead-pick b {
+      flex: 0 0 auto;
+      color: #2f6fed;
+      font: 600 9px/1 var(--mono);
+      letter-spacing: 0.02em;
+    }
+
+    .warhead-pick span {
+      min-width: 0;
+      overflow: hidden;
+      color: rgba(24, 24, 22, 0.58);
+      font: 500 8.5px/1 var(--mono);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .warhead-row.selected .warhead-pick span { color: var(--ink); }
+
+    .warhead-delete {
+      flex: 0 0 auto;
+      width: 20px;
+      height: 20px;
+      margin-right: 2px;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      color: rgba(24, 24, 22, 0.38);
+      font: 400 13px/1 var(--sans);
+      cursor: pointer;
+    }
+
+    .warhead-delete:hover {
+      background: rgba(24, 24, 22, 0.07);
+      color: var(--ink);
+    }
+
+    .warhead-actions {
+      display: flex;
+      gap: 5px;
+      margin-top: 5px;
+    }
+
+    .warhead-actions button {
+      flex: 1;
+      height: 24px;
+      padding: 0 6px;
+      border: 1px solid var(--hairline);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.36);
+      color: var(--ink);
+      font: 500 8.5px/1 var(--mono);
+      letter-spacing: 0.01em;
+      cursor: pointer;
+    }
+
+    .warhead-actions button:hover { background: rgba(255, 255, 255, 0.78); }
+
+    .warhead-actions button:disabled {
+      cursor: default;
+      opacity: 0.32;
+    }
+
+    .nuke-label {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font: 500 9px/1.2 var(--mono);
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    .nuke-label output {
+      color: var(--ink);
+      font: 500 11px/1.2 var(--mono);
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    .nuke-panel input[type="range"] {
+      display: block;
+      width: 100%;
+      height: 18px;
+      margin: 7px 0 0;
+      accent-color: var(--ink);
+      cursor: pointer;
+    }
+
+    .nuke-inline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 3px;
+      color: var(--muted);
+      font: 500 8.5px/1.2 var(--mono);
+      letter-spacing: 0.04em;
+    }
+
+    .nuke-mini {
+      padding: 5px 8px;
+      border: 1px solid var(--hairline);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--muted);
+      font: 500 8.5px/1 var(--mono);
+      letter-spacing: 0.04em;
+      cursor: pointer;
+    }
+
+    .nuke-mini.active {
+      border-color: rgba(31, 99, 232, 0.30);
+      background: rgba(31, 99, 232, 0.08);
+      color: #1f63e8;
+    }
+
+    .nuke-mini:disabled { opacity: 0.35; cursor: default; }
+
+    .nuke-seg {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2px;
+      margin-top: 14px;
+      padding: 3px;
+      border: 1px solid var(--hairline);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.34);
+    }
+
+    .nuke-seg button {
+      padding: 7px 8px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--muted);
+      font: 500 9px/1 var(--mono);
+      letter-spacing: 0.06em;
+      cursor: pointer;
+    }
+
+    .nuke-seg button[aria-pressed="true"] {
+      background: var(--ink);
+      color: #f8f6f0;
+    }
+
+    .nuke-coords {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 13px;
+      color: var(--muted);
+      font: 500 8.5px/1.2 var(--mono);
+      letter-spacing: 0.05em;
+    }
+
+    .nuke-coords b {
+      color: var(--ink);
+      font-weight: 500;
+    }
+
+    .nuke-coords small {
+      margin-left: auto;
+      color: var(--muted);
+      font: inherit;
+      opacity: 0.8;
+    }
+
+    .nuke-actions {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 7px;
+      margin-top: 12px;
+    }
+
+    .nuke-actions button,
+    .nuke-fit,
+    .nuke-time-row button {
+      padding: 10px 13px;
+      border-radius: 999px;
+      font: 500 9px/1 var(--mono);
+      letter-spacing: 0.08em;
+      cursor: pointer;
+    }
+
+    .nuke-actions .primary {
+      border: 1px solid var(--ink);
+      background: var(--ink);
+      color: #f8f6f0;
+    }
+
+    .nuke-actions .primary:hover { background: #34342f; }
+
+    .nuke-actions .secondary,
+    .nuke-time-row button,
+    .nuke-fit {
+      border: 1px solid var(--hairline);
+      background: rgba(255, 255, 255, 0.34);
+      color: var(--ink);
+    }
+
+    .nuke-actions .secondary:hover,
+    .nuke-time-row button:hover,
+    .nuke-fit:hover { background: rgba(255, 255, 255, 0.72); }
+
+    .nuke-actions button:disabled,
+    .nuke-time-row button:disabled,
+    .nuke-fit:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+
+    .nuke-readout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 12px;
+      margin-top: 14px;
+      padding: 11px 0;
+      border-top: 1px solid var(--hairline);
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .nuke-readout div {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 6px;
+      color: var(--muted);
+      font: 500 8.5px/1 var(--mono);
+      letter-spacing: 0.07em;
+    }
+
+    .nuke-readout b {
+      color: var(--ink);
+      font: 500 10px/1 var(--mono);
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+    }
+
+    .nuke-area-line {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 8px;
+      color: var(--muted);
+      font: 500 8.5px/1.2 var(--mono);
+      letter-spacing: 0.05em;
+    }
+
+    .nuke-area-line b {
+      color: #1f63e8;
+      font: 500 11px/1.2 var(--mono);
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+    }
+
+    .nuke-fit {
+      width: 100%;
+      margin-top: 8px;
+      padding: 7px 10px;
+      border-radius: 8px;
+      font-size: 8.5px;
+    }
+
+    .nuke-time { margin-top: 14px; }
+
+    .nuke-time-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 7px;
+    }
+
+    .nuke-time-row button {
+      min-width: 70px;
+      padding: 7px 10px;
+      border-radius: 8px;
+    }
+
+    #effect-time {
+      margin-left: auto;
+      color: var(--ink);
+      font: 500 10px/1 var(--mono);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+    }
+
+    .nuke-note {
+      margin: 13px 0 0;
+      color: var(--muted);
+      font: 500 8px/1.5 var(--mono);
+      letter-spacing: 0.02em;
+      opacity: 0.85;
+    }
+
+    /* 每个线圈标注的独立显示开关。 */
+    .label-controls {
+      position: fixed;
+      left: 34px;
+      bottom: 78px;
+      z-index: 8;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      max-width: calc(100vw - 68px);
+      padding: 6px 8px;
+      border: 1px solid rgba(24, 24, 22, 0.14);
+      border-radius: 10px;
+      background: rgba(250, 248, 243, 0.88);
+      box-shadow: 0 10px 28px rgba(40, 36, 30, 0.08);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+
+    .label-controls-title {
+      padding: 0 5px 0 2px;
+      color: rgba(24, 24, 22, 0.55);
+      font: 500 9px/1 var(--mono);
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+
+    .label-controls-title em {
+      color: rgba(24, 24, 22, 0.34);
+      font-style: normal;
+      font-size: 7.5px;
+      letter-spacing: 0.08em;
+    }
+
+    .ring-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 26px;
+      padding: 0 8px;
+      border: 1px solid transparent;
+      border-radius: 7px;
+      background: transparent;
+      color: rgba(24, 24, 22, 0.46);
+      font: 600 9px/1 var(--mono);
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+    }
+
+    .ring-chip i {
+      width: 8px;
+      height: 8px;
+      border: 1.5px solid currentColor;
+      border-radius: 50%;
+      opacity: 0.55;
+      transition: background 0.16s ease, border-color 0.16s ease, opacity 0.16s ease;
+    }
+
+    .ring-chip.active {
+      border-color: rgba(47, 111, 237, 0.18);
+      background: rgba(47, 111, 237, 0.07);
+      color: var(--ink);
+    }
+
+    .ring-chip.active i {
+      border-color: #2f6fed;
+      background: #2f6fed;
+      opacity: 1;
+    }
+
+    .ring-chip.thermal.active {
+      border-color: rgba(224, 122, 31, 0.22);
+      background: rgba(224, 122, 31, 0.07);
+    }
+
+    .ring-chip.thermal.active i {
+      border-color: #e07a1f;
+      background: #e07a1f;
+    }
+
+    .ring-chip:hover {
+      color: var(--ink);
+      background: rgba(24, 24, 22, 0.05);
+    }
+
+    .nuke-toggle {
+      display: none;
+      position: fixed;
+      top: 22px;
+      right: 20px;
+      z-index: 9;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 13px;
+      border: 1px solid var(--hairline);
+      border-radius: 999px;
+      background: rgba(250, 248, 243, 0.82);
+      color: var(--ink);
+      font: 500 9px/1 var(--mono);
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+
+    .label-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .label-layer * { pointer-events: none; }
+
+    .blast-label {
+      color: #1f63e8;
+      pointer-events: none;
+      white-space: nowrap;
+      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.62);
+    }
+
+    .blast-label-inner {
+      transform: translate(12px, -50%);
+    }
+
+    .blast-label-head {
+      font: 600 clamp(20px, 2.25vw, 32px)/1 var(--sans);
+      letter-spacing: -0.035em;
+    }
+
+    .blast-label-detail {
+      margin-top: 5px;
+      color: var(--ink);
+      font: 500 13px/1.2 var(--mono);
+      letter-spacing: 0.02em;
+    }
+
+    .blast-label-note {
+      margin-top: 3px;
+      color: rgba(24, 24, 22, 0.54);
+      font: 500 9px/1.2 var(--mono);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .blast-label-thermal {
+      color: #d86f12;
+    }
+
+    .blast-label-thermal .blast-label-head { color: #d86f12; }
+    .blast-label-thermal .blast-label-detail { color: #a8530d; }
+    .blast-label-thermal .blast-label-note { color: rgba(168, 83, 13, 0.68); }
+    .blast-label-thermal .blast-label-head,
+    .blast-label-thermal .blast-label-detail,
+    .blast-label-thermal .blast-label-note {
+      text-shadow: 0 0 5px rgba(248, 245, 238, 0.95), 0 0 12px rgba(248, 245, 238, 0.7);
+    }
+
+    .blast-label.is-hidden { display: none; }
+
+    .blast-label-mini .blast-label-head {
+      font-size: clamp(11px, 0.9vw, 13px);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .blast-label-mini .blast-label-detail {
+      margin-top: 2px;
+      font-size: 9px;
+    }
+
+    .blast-label-mini .blast-label-inner {
+      transform: translate(8px, -50%);
+    }
+
+    .blast-label-mini .blast-label-head,
+    .blast-label-mini .blast-label-detail {
+      text-shadow: 0 0 5px rgba(248, 245, 238, 0.98), 0 0 11px rgba(248, 245, 238, 0.8);
+    }
+
+    .hint {
+      position: fixed;
+      top: 56px;
+      right: 34px;
+      z-index: 4;
+      color: var(--muted);
+      font: 500 9px/1.75 var(--mono);
+      letter-spacing: 0.05em;
+      text-align: right;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .hint kbd {
+      display: inline-block;
+      min-width: 17px;
+      margin-right: 4px;
+      padding: 2px 4px;
+      border: 1px solid var(--hairline);
+      border-radius: 3px;
+      color: var(--ink);
+      font: inherit;
+      text-align: center;
+    }
+
+    .dock {
+      position: fixed;
+      left: 50%;
+      bottom: 27px;
+      z-index: 6;
+      display: flex;
+      align-items: stretch;
+      gap: 7px;
+      padding: 7px;
+      border: 1px solid var(--hairline);
+      border-radius: 999px;
+      background: rgba(250, 248, 243, 0.62);
+      box-shadow: 0 10px 40px rgba(57, 52, 43, 0.07);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      transform: translateX(-50%);
+    }
+
+    .size-switch {
+      display: flex;
+      gap: 2px;
+    }
+
+    .size-switch button {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      min-width: 75px;
+      padding: 9px 12px 8px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: color 180ms var(--ease), background 180ms var(--ease);
+    }
+
+    .size-switch button:hover {
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.50);
+    }
+
+    .size-switch button[aria-pressed="true"] {
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 1px 4px rgba(41, 37, 30, 0.08);
+    }
+
+    .size-switch .cn {
+      font: 500 11px/1.1 var(--sans);
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+
+    .size-switch .en {
+      font: 500 7.5px/1 var(--mono);
+      letter-spacing: 0.14em;
+      opacity: 0.55;
+      white-space: nowrap;
+    }
+
+    .generate {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 0 18px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--ink);
+      color: #f7f5ef;
+      cursor: pointer;
+      font: 500 10px/1 var(--mono);
+      letter-spacing: 0.10em;
+      white-space: nowrap;
+      transition: background 180ms var(--ease), transform 180ms var(--ease);
+    }
+
+    .generate:hover { background: #34342f; }
+    .generate:active { transform: scale(0.975); }
+
+    .generate svg {
+      width: 13px;
+      height: 13px;
+      transition: transform 600ms var(--ease);
+    }
+
+    .generate:hover svg { transform: rotate(-180deg); }
+
+    .generate:focus-visible,
+    .size-switch button:focus-visible {
+      outline: 2px solid var(--ink);
+      outline-offset: 2px;
+    }
+
+    #loading {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: var(--paper);
+      color: var(--muted);
+      font: 500 10px/1 var(--mono);
+      letter-spacing: 0.18em;
+      transition: opacity 550ms ease, visibility 550ms ease;
+    }
+
+    #loading.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .spinner {
+      width: 13px;
+      height: 13px;
+      border: 1px solid rgba(24, 24, 22, 0.18);
+      border-top-color: var(--ink);
+      border-radius: 50%;
+      animation: spin 700ms linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #error {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+      background: var(--paper);
+      color: #6d3228;
+      font: 500 12px/1.7 var(--mono);
+      text-align: center;
+      white-space: pre-wrap;
+    }
+
+    @media (max-width: 1080px) {
+      .hint { display: none; }
+    }
+
+    @media (max-width: 980px) {
+      .seed-label { display: none; }
+
+      .nuke-toggle { display: inline-flex; }
+
+      .nuke-panel {
+        display: none;
+        top: auto;
+        right: 16px;
+        bottom: 118px;
+        left: 16px;
+        width: auto;
+        max-height: 50vh;
+        z-index: 9;
+        padding: 14px;
+        border-radius: 14px;
+      }
+
+      .nuke-panel.open { display: block; }
+      .nuke-close { display: inline-flex; align-items: center; justify-content: center; }
+      .blast-label-head { font-size: 17px; }
+      .blast-label-detail { font-size: 10px; }
+      .blast-label-note { display: none; }
+      .blast-label-thermal .blast-label-inner { transform: translate(12px, 26px); }
+    }
+
+    @media (min-width: 701px) and (max-width: 1500px) {
+      .blast-label-max .blast-label-inner { transform: translate(12px, 60px); }
+    }
+
+    @media (max-width: 760px) {
+      header {
+        top: 22px;
+        left: 20px;
+        max-width: calc(100vw - 40px);
+      }
+
+      .seed-label { display: none; }
+      .meta { gap: 7px 11px; margin-top: 16px; }
+
+      .label-controls {
+        left: 20px;
+        right: 20px;
+        bottom: 92px;
+        max-width: none;
+        flex-wrap: nowrap;
+        gap: 3px;
+        padding: 6px;
+        overflow: hidden;
+      }
+
+      .label-controls-title {
+        display: none;
+      }
+
+      .ring-chip {
+        height: 23px;
+        padding: 0 5px;
+        gap: 4px;
+        font-size: 7.5px;
+      }
+
+      .ring-chip i {
+        width: 6px;
+        height: 6px;
+        border-width: 1.2px;
+      }
+
+      .population-panel {
+        top: 160px;
+        left: 20px;
+        right: 20px;
+        width: auto;
+        max-width: 430px;
+        padding: 13px 14px 12px;
+        border-radius: 14px;
+      }
+
+      .population-total { font-size: 20px; }
+
+      .population-metrics {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 10px;
+      }
+
+      .population-row {
+        flex-direction: column;
+        gap: 5px;
+        padding-top: 7px;
+      }
+
+      .population-row + .population-row { margin-top: 0; }
+
+      .population-label {
+        gap: 5px;
+        font-size: 9px;
+        letter-spacing: 0.03em;
+      }
+
+      .population-row b {
+        font-size: clamp(12px, 3.4vw, 14px);
+      }
+
+      .dock {
+        bottom: 12px;
+        width: calc(100vw - 24px);
+        flex-direction: column;
+        gap: 6px;
+        padding: 6px;
+        border-radius: 24px;
+      }
+
+      .size-switch {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      .size-switch button {
+        min-width: 0;
+        padding: 8px 3px 7px;
+      }
+
+      .size-switch .en { display: none; }
+
+      .generate {
+        min-height: 38px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="scene" aria-label="白色微缩城市三维模型"></canvas>
+  <div class="vignette"></div>
+
+  <header>
+    <div class="eyebrow">Urban Test Model / 02</div>
+    <h1>
+      MICRO CITY
+      <span>微缩城市 · 毁伤试验场</span>
+    </h1>
+    <div class="meta">
+      <span><b id="size-label">中等城市</b> / 场地规模</span>
+      <span class="dot"></span>
+      <span><b id="building-count">—</b> 栋建筑</span>
+      <span class="dot"></span>
+      <span><b id="landmark-count">—</b> 地标</span>
+      <span class="dot"></span>
+      <span>约 <b id="area-label">—</b> KM²</span>
+    </div>
+  </header>
+
+  <aside class="population-panel" aria-label="人口统计，可拖动" title="拖动移动人口面板，双击复位">
+    <span class="population-grip" aria-hidden="true">
+      <i></i><i></i><i></i><i></i><i></i><i></i>
+    </span>
+    <span class="population-kicker">POPULATION / 总人口</span>
+    <b class="population-total" id="population-total">—</b>
+    <div class="population-metrics">
+      <div class="population-row alive">
+        <span class="population-label">生存人口</span>
+        <b id="population-alive">—</b>
+      </div>
+      <div class="population-row injured">
+        <span class="population-label">受伤人口</span>
+        <b id="population-injured">—</b>
+      </div>
+      <div class="population-row dead">
+        <span class="population-label">死亡人口</span>
+        <b id="population-dead">—</b>
+      </div>
+    </div>
+  </aside>
+
+  <div id="label-controls" class="label-controls" role="group" aria-label="线圈标注开关">
+    <span class="label-controls-title">标注 <em>LABELS</em></span>
+    <button class="ring-chip active" type="button" data-ring-label="r20" aria-pressed="true">
+      <i aria-hidden="true"></i>20 psi
+    </button>
+    <button class="ring-chip active" type="button" data-ring-label="r10" aria-pressed="true">
+      <i aria-hidden="true"></i>10 psi
+    </button>
+    <button class="ring-chip active" type="button" data-ring-label="r5" aria-pressed="true">
+      <i aria-hidden="true"></i>5 psi
+    </button>
+    <button class="ring-chip active" type="button" data-ring-label="r1" aria-pressed="true">
+      <i aria-hidden="true"></i>1 psi
+    </button>
+    <button class="ring-chip active thermal" type="button" data-ring-label="thermal" aria-pressed="true">
+      <i aria-hidden="true"></i>热辐射
+    </button>
+  </div>
+
+  <button id="nuke-toggle" class="nuke-toggle" type="button" aria-controls="nuke-panel" aria-expanded="false">
+    核爆设置
+  </button>
+
+  <aside id="nuke-panel" class="nuke-panel" aria-label="核爆参数">
+    <div class="nuke-head">
+      <div>
+        <span class="nuke-kicker">Nuclear Effects / 多弹头</span>
+        <b class="nuke-title" id="nuke-title">W1 · 100 kt · 空爆</b>
+      </div>
+      <div class="nuke-head-side">
+        <span class="nuke-status" id="blast-status">待引爆</span>
+        <button id="nuke-close" class="nuke-close" type="button" aria-label="关闭核爆设置">×</button>
+      </div>
+    </div>
+
+    <div class="warhead-block">
+      <div class="warhead-head">
+        <span>弹头 / WARHEADS</span>
+        <b id="warhead-count">1 / 6</b>
+      </div>
+      <div id="warhead-list" class="warhead-list"></div>
+      <div class="warhead-actions">
+        <button id="add-warhead" type="button">+ 添加弹头</button>
+        <button id="mirv-array" type="button">MIRV 阵列</button>
+      </div>
+    </div>
+
+    <div class="nuke-field">
+      <div class="nuke-label">
+        <span>当量 / YIELD</span>
+        <output id="yield-output">100 kt</output>
+      </div>
+      <input id="yield-slider" type="range" min="0" max="1000" step="1" value="667" aria-label="核爆当量" />
+    </div>
+
+    <div class="nuke-field">
+      <div class="nuke-label">
+        <span>爆炸高度 / HOB</span>
+        <output id="hob-output">1,160 m</output>
+      </div>
+      <input id="hob-slider" type="range" min="0" max="6000" step="10" value="1160" aria-label="爆炸高度" />
+      <div class="nuke-inline">
+        <button id="optimal-hob" class="nuke-mini active" type="button">最佳空爆</button>
+        <span id="hob-note">按 20 psi 最大覆盖</span>
+      </div>
+    </div>
+
+    <div class="nuke-seg" role="group" aria-label="爆炸方式">
+      <button type="button" data-burst="air" aria-pressed="true">空爆</button>
+      <button type="button" data-burst="ground" aria-pressed="false">地爆</button>
+    </div>
+
+    <div class="nuke-coords">
+      <span>爆心</span>
+      <b id="bomb-coords">X 0 m / Z 0 m</b>
+      <small>左键放置 / 右键移除</small>
+    </div>
+
+    <div class="nuke-actions">
+      <button id="detonate" class="primary" type="button">引爆</button>
+      <button id="reset-blast" class="secondary" type="button">重置</button>
+    </div>
+
+    <div class="nuke-readout">
+      <div><span>20 PSI</span><b id="r20">—</b></div>
+      <div><span>10 PSI</span><b id="r10">—</b></div>
+      <div><span>5 PSI</span><b id="r5">—</b></div>
+      <div><span>1 PSI</span><b id="r1">—</b></div>
+      <div><span>热辐射 8</span><b id="thermal">—</b></div>
+      <div><span>火球</span><b id="rfire">—</b></div>
+    </div>
+
+    <div class="nuke-area-line">
+      <span>1 PSI 最大破坏圈面积</span>
+      <b id="one-psi-area">—</b>
+    </div>
+
+    <button id="fit-blast" class="nuke-fit" type="button">适配杀伤区</button>
+
+    <div class="nuke-time">
+      <div class="nuke-label">
+        <span>效果时间倍率</span>
+        <output id="time-output">1.0×</output>
+      </div>
+      <input id="time-slider" type="range" min="0" max="1000" step="1" value="500" aria-label="效果时间倍率" />
+      <div class="nuke-time-row">
+        <button id="playback" type="button" disabled>暂停</button>
+        <span id="effect-time">T+0.0 s</span>
+      </div>
+    </div>
+
+    <p class="nuke-note">20/10/5/1 psi 超压圈 · 橙色 8 cal/cm² 热辐射 · 蓝白扩散环为冲击波<br />多弹头重叠取最大 · 建筑毁伤/伤亡随波结算 · 医疗时钟未接入</p>
+  </aside>
+
+  <div class="seed-label">SEED <b id="seed-label">—</b></div>
+
+  <div class="hint">
+    <kbd>拖拽</kbd> 旋转 &nbsp;·&nbsp; <kbd>滚轮</kbd> 缩放 &nbsp;·&nbsp;
+    <kbd>左键</kbd> 放置 &nbsp;·&nbsp; <kbd>右键</kbd> 移除 &nbsp;·&nbsp; <kbd>R</kbd> 随机生成
+  </div>
+
+  <div class="dock">
+    <div class="size-switch" role="group" aria-label="模拟场地规模">
+      <button type="button" data-size="small" aria-pressed="false">
+        <span class="cn">小城市</span>
+        <span class="en">SMALL</span>
+      </button>
+      <button type="button" data-size="medium" aria-pressed="true">
+        <span class="cn">中等城市</span>
+        <span class="en">MEDIUM</span>
+      </button>
+      <button type="button" data-size="large" aria-pressed="false">
+        <span class="cn">大型城市</span>
+        <span class="en">LARGE</span>
+      </button>
+      <button type="button" data-size="mega" aria-pressed="false">
+        <span class="cn">超大型城市</span>
+        <span class="en">MEGA</span>
+      </button>
+    </div>
+
+    <button id="regenerate" class="generate" type="button" title="随机生成一座新城市（快捷键 R）">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25" aria-hidden="true">
+        <path d="M13.2 6.2A5.7 5.7 0 1 0 13.5 9" />
+        <path d="M13.3 2.9v3.5H9.8" />
+      </svg>
+      随机生成
+    </button>
+  </div>
+
+  <div id="loading">
+    <span class="spinner"></span>
+    <span>BUILDING CITY MODEL</span>
+  </div>
+
+  <div id="error"></div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
+
+    /* ------------------------------------------------------------------ *
+     *  MICRO CITY / 02
+     *  White-on-white city model for damage simulation tests.
+     *
+     *  v2 changes
+     *  - four selectable city scales
+     *  - irregular street grid + diagonal avenues
+     *  - BSP lot subdivision with random gaps and setbacks
+     *  - lower, more realistic building heights
+     *  - new seeds on load and one-click reroll
+     * ------------------------------------------------------------------ */
+
+    const CITY_PRESETS = {
+      small: {
+        label: "小城市",
+        en: "SMALL",
+        radius: 1875,
+        block: 48,
+        heightScale: 0.90,
+        districts: 12,
+        secondaryCenters: 1,
+        landmarkCount: 5,
+        landmarkMin: 78,
+        landmarkMax: 112,
+        avenues: 1,
+        shadowMap: 2048,
+        area: 11.3,
+        populationMin: 100000,
+        populationMax: 500000,
+        parkChance: 0.55,
+      },
+      medium: {
+        label: "中等城市",
+        en: "MEDIUM",
+        radius: 3000,
+        block: 62,
+        heightScale: 1.12,
+        districts: 20,
+        secondaryCenters: 2,
+        landmarkCount: 8,
+        landmarkMin: 108,
+        landmarkMax: 158,
+        avenues: 2,
+        shadowMap: 2048,
+        area: 28.3,
+        populationMin: 500000,
+        populationMax: 2000000,
+        parkChance: 0.65,
+      },
+      large: {
+        label: "大型城市",
+        en: "LARGE",
+        radius: 4500,
+        block: 78,
+        heightScale: 1.28,
+        districts: 30,
+        secondaryCenters: 3,
+        landmarkCount: 12,
+        landmarkMin: 135,
+        landmarkMax: 195,
+        avenues: 2,
+        shadowMap: 4096,
+        area: 63.6,
+        populationMin: 2000000,
+        populationMax: 8000000,
+        parkChance: 0.72,
+      },
+      mega: {
+        label: "超大型城市",
+        en: "MEGA",
+        radius: 6500,
+        block: 92,
+        heightScale: 1.42,
+        districts: 42,
+        secondaryCenters: 4,
+        landmarkCount: 18,
+        landmarkMin: 165,
+        landmarkMax: 240,
+        avenues: 3,
+        shadowMap: 4096,
+        area: 132.7,
+        populationMin: 8000000,
+        populationMax: 20000000,
+        parkChance: 0.78,
+      },
+    };
+
+    const TAU = Math.PI * 2;
+    const PAPER = 0xded9cf;
+
+    const canvas = document.querySelector("#scene");
+    const loadingEl = document.querySelector("#loading");
+    const errorEl = document.querySelector("#error");
+    const sizeLabelEl = document.querySelector("#size-label");
+    const countEl = document.querySelector("#building-count");
+    const landmarkEl = document.querySelector("#landmark-count");
+    const areaEl = document.querySelector("#area-label");
+    const seedEl = document.querySelector("#seed-label");
+    const regenerateEl = document.querySelector("#regenerate");
+    const sizeButtons = Array.from(document.querySelectorAll("[data-size]"));
+    const populationTotalEl = document.querySelector("#population-total");
+    const populationAliveEl = document.querySelector("#population-alive");
+    const populationInjuredEl = document.querySelector("#population-injured");
+    const populationDeadEl = document.querySelector("#population-dead");
+    const populationPanel = document.querySelector(".population-panel");
+    const populationFormatter = new Intl.NumberFormat("en-US");
+
+    // 每个线圈标注独立开关；移动端默认先收起中心三圈的文字。
+    const labelVisibility = {
+      r20: true,
+      r10: true,
+      r5: true,
+      r1: true,
+      thermal: true,
+    };
+    const ringChips = Array.from(
+      document.querySelectorAll("[data-ring-label]")
+    );
+
+    function syncRingChips() {
+      for (const chip of ringChips) {
+        const visible = Boolean(labelVisibility[chip.dataset.ringLabel]);
+        chip.classList.toggle("active", visible);
+        chip.setAttribute("aria-pressed", String(visible));
+      }
+    }
+
+    function setRingLabelVisibility(kind, visible) {
+      labelVisibility[kind] = Boolean(visible);
+      syncRingChips();
+      const selectedEffect = blastEffectsList.find(
+        (effect) => effect.bomb.id === selectedWarheadId
+      );
+      if (selectedEffect) {
+        selectedEffect.setLabelVisibility(kind, labelVisibility[kind]);
+      }
+    }
+
+    for (const chip of ringChips) {
+      chip.addEventListener("click", () => {
+        const kind = chip.dataset.ringLabel;
+        setRingLabelVisibility(kind, !labelVisibility[kind]);
+      });
+    }
+
+    if (window.innerWidth <= 760) {
+      labelVisibility.r20 = false;
+      labelVisibility.r10 = false;
+      labelVisibility.r5 = false;
+    }
+    syncRingChips();
+
+    const nukePanel = document.querySelector("#nuke-panel");
+    const nukeToggle = document.querySelector("#nuke-toggle");
+    const nukeClose = document.querySelector("#nuke-close");
+    const nukeTitle = document.querySelector("#nuke-title");
+    const blastStatusEl = document.querySelector("#blast-status");
+    const yieldSlider = document.querySelector("#yield-slider");
+    const yieldOutput = document.querySelector("#yield-output");
+    const hobSlider = document.querySelector("#hob-slider");
+    const hobOutput = document.querySelector("#hob-output");
+    const optimalHobButton = document.querySelector("#optimal-hob");
+    const hobNote = document.querySelector("#hob-note");
+    const burstButtons = Array.from(document.querySelectorAll("[data-burst]"));
+    const bombCoordsEl = document.querySelector("#bomb-coords");
+    const detonateButton = document.querySelector("#detonate");
+    const resetBlastButton = document.querySelector("#reset-blast");
+    const warheadListEl = document.querySelector("#warhead-list");
+    const warheadCountEl = document.querySelector("#warhead-count");
+    const addWarheadButton = document.querySelector("#add-warhead");
+    const mirvArrayButton = document.querySelector("#mirv-array");
+    const fitBlastButton = document.querySelector("#fit-blast");
+    const r20El = document.querySelector("#r20");
+    const r10El = document.querySelector("#r10");
+    const r5El = document.querySelector("#r5");
+    const r1El = document.querySelector("#r1");
+    const thermalEl = document.querySelector("#thermal");
+    const onePsiAreaEl = document.querySelector("#one-psi-area");
+    const rfireEl = document.querySelector("#rfire");
+    const timeSlider = document.querySelector("#time-slider");
+    const timeOutput = document.querySelector("#time-output");
+    const playbackButton = document.querySelector("#playback");
+    const effectTimeEl = document.querySelector("#effect-time");
+
+    const populationState = {
+      total: 0,
+      alive: 0,
+      injured: 0,
+      dead: 0,
+    };
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(PAPER);
+    scene.fog = new THREE.Fog(PAPER, 2200, 6000);
+
+    const camera = new THREE.PerspectiveCamera(
+      45,
+      window.innerWidth / window.innerHeight,
+      1,
+      40000
+    );
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      powerPreference: "high-performance",
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.autoUpdate = false;
+    renderer.shadowMap.needsUpdate = true;
+
+    const labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.domElement.className = "label-layer";
+    labelRenderer.domElement.style.position = "fixed";
+    labelRenderer.domElement.style.inset = "0";
+    labelRenderer.domElement.style.zIndex = "3";
+    document.body.appendChild(labelRenderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.055;
+    controls.rotateSpeed = 0.55;
+    controls.zoomSpeed = 0.75;
+    controls.panSpeed = 0.55;
+    controls.minPolarAngle = 0.12;
+    controls.maxPolarAngle = Math.PI * 0.492;
+    // 右键用于移除弹头，不再用于平移。
+    controls.mouseButtons.RIGHT = null;
+
+    /* ------------------------------- lights ------------------------------- */
+
+    const hemi = new THREE.HemisphereLight(0xffffff, 0xd8d4cb, 1.25);
+    hemi.position.set(0, 180, 0);
+    scene.add(hemi);
+
+    // One soft key light. The hemisphere does most of the fill so the
+    // scene reads like an unpainted plaster model rather than a night city.
+    const keyLight = new THREE.DirectionalLight(0xfffdfa, 1.55);
+    keyLight.castShadow = true;
+    keyLight.shadow.bias = -0.00012;
+    keyLight.shadow.normalBias = 0.42;
+    keyLight.shadow.radius = 4;
+    scene.add(keyLight);
+    scene.add(keyLight.target);
+
+    /* ------------------------------ materials ----------------------------- */
+
+    const groundMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.9,
+      metalness: 0.0,
+    });
+
+    const buildingMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.9,
+      metalness: 0.0,
+    });
+
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(120000, 120000), groundMaterial);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.4;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const buildingGeometry = new THREE.BoxGeometry(1, 1, 1);
+    buildingGeometry.translate(0, 0.5, 0); // base at y=0; scale.y is building height
+
+    /* --------------------------- random helpers --------------------------- */
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function hashString(value) {
+      let h = 2166136261;
+      for (let i = 0; i < value.length; i++) {
+        h ^= value.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return h >>> 0;
+    }
+
+    function mulberry32(a) {
+      return function random() {
+        a |= 0;
+        a = (a + 0x6d2b79f5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function randomSeed() {
+      return String(Math.floor(100000 + Math.random() * 900000));
+    }
+
+    /* ------------------------- city layout helpers ------------------------ */
+
+    function makeDistricts(preset, rng) {
+      const R = preset.radius;
+      const cols = Math.ceil(Math.sqrt(preset.districts));
+      const spacing = (R * 2) / cols;
+      const districts = [];
+
+      // A jittered lattice gives every district a compact Voronoi cell
+      // without locking the whole city into one street orientation.
+      for (let ix = 0; ix < cols; ix++) {
+        for (let iz = 0; iz < cols; iz++) {
+          const x = -R + (ix + 0.5) * spacing + (rng() - 0.5) * spacing * 0.62;
+          const z = -R + (iz + 0.5) * spacing + (rng() - 0.5) * spacing * 0.62;
+          if (Math.hypot(x, z) > R * 1.04) continue;
+
+          districts.push({
+            x,
+            z,
+            angle: rng() * Math.PI,
+            block: preset.block * (0.82 + rng() * 0.42),
+            extent: 0,
+            index: districts.length,
+          });
+        }
+      }
+
+      for (const district of districts) {
+        let nearest = R;
+        for (const other of districts) {
+          if (other === district) continue;
+          nearest = Math.min(nearest, Math.hypot(other.x - district.x, other.z - district.z));
+        }
+
+        district.extent = Math.min(
+          R * 0.95,
+          Math.max(spacing * 0.82, nearest * 1.72 + district.block * 1.6)
+        );
+      }
+
+      return districts;
+    }
+
+    function makeLocalAxis(extent, avgBlock, rng) {
+      const coords = [{ pos: -extent, width: 0 }];
+      let pos = -extent;
+
+      while (pos < extent) {
+        pos += avgBlock * (0.74 + rng() * 0.54);
+        if (pos > extent - avgBlock * 0.30) break;
+
+        const major = rng() < 0.11;
+        const width = major ? 18 + rng() * 12 : 6 + rng() * 8;
+        coords.push({ pos, width });
+      }
+
+      coords.push({ pos: extent, width: 0 });
+      return coords;
+    }
+
+    function nearestDistricts(x, z, districts) {
+      let index = -1;
+      let best = Infinity;
+      let second = Infinity;
+
+      for (let i = 0; i < districts.length; i++) {
+        const dx = x - districts[i].x;
+        const dz = z - districts[i].z;
+        const distanceSq = dx * dx + dz * dz;
+
+        if (distanceSq < best) {
+          second = best;
+          best = distanceSq;
+          index = i;
+        } else if (distanceSq < second) {
+          second = distanceSq;
+        }
+      }
+
+      return {
+        index,
+        distance: Math.sqrt(best),
+        secondDistance: Math.sqrt(second),
+      };
+    }
+
+    function makeAvenues(radius, count, rng) {
+      const avenues = [];
+
+      for (let i = 0; i < count; i++) {
+        const angle = rng() * Math.PI;
+        avenues.push({
+          nx: Math.cos(angle),
+          nz: Math.sin(angle),
+          offset: (rng() - 0.5) * radius * 0.95,
+          halfWidth: radius * (0.0045 + rng() * 0.0045) + 4,
+        });
+      }
+
+      return avenues;
+    }
+
+    function makeCenters(preset, rng) {
+      const R = preset.radius;
+      const centers = [{
+        x: (rng() - 0.5) * R * 0.14,
+        z: (rng() - 0.5) * R * 0.14,
+        sigma: R * 0.23,
+        weight: 1,
+      }];
+
+      for (let i = 0; i < preset.secondaryCenters; i++) {
+        const angle = rng() * TAU;
+        const distance = R * (0.35 + rng() * 0.35);
+        centers.push({
+          x: Math.cos(angle) * distance,
+          z: Math.sin(angle) * distance,
+          sigma: R * (0.10 + rng() * 0.07),
+          weight: 0.42 + rng() * 0.30,
+        });
+      }
+
+      return centers;
+    }
+
+    function coreAt(x, z, centers) {
+      let value = 0;
+
+      for (const center of centers) {
+        const dx = x - center.x;
+        const dz = z - center.z;
+        const influence = center.weight
+          * Math.exp(-(dx * dx + dz * dz) / (2 * center.sigma * center.sigma));
+        if (influence > value) value = influence;
+      }
+
+      return value;
+    }
+
+    function makePark(preset, rng) {
+      if (rng() > preset.parkChance) return null;
+      const R = preset.radius;
+
+      return {
+        x: (rng() - 0.5) * R * 0.58,
+        z: (rng() - 0.5) * R * 0.58,
+        rx: R * (0.045 + rng() * 0.040),
+        rz: R * (0.035 + rng() * 0.045),
+        rotation: rng() * Math.PI,
+      };
+    }
+
+    function insidePark(x, z, park) {
+      if (!park) return false;
+      const dx = x - park.x;
+      const dz = z - park.z;
+      const c = Math.cos(-park.rotation);
+      const s = Math.sin(-park.rotation);
+      const lx = dx * c - dz * s;
+      const lz = dx * s + dz * c;
+      return (lx * lx) / (park.rx * park.rx) + (lz * lz) / (park.rz * park.rz) < 1;
+    }
+
+    function makeBoundary(radius, rng) {
+      const gapCount = radius > 2000 ? 3 : radius > 1000 ? 2 : 1;
+      const gaps = [];
+
+      for (let i = 0; i < gapCount; i++) {
+        gaps.push({
+          angle: rng() * TAU,
+          width: 0.16 + rng() * 0.16,
+        });
+      }
+
+      return {
+        radius,
+        p1: rng() * TAU,
+        p2: rng() * TAU,
+        p3: rng() * TAU,
+        gaps,
+      };
+    }
+
+    function insideCity(x, z, boundary) {
+      const r = Math.hypot(x, z);
+      const angle = Math.atan2(z, x);
+      const wobble =
+        0.93
+        + 0.075 * Math.sin(angle * 2 + boundary.p1)
+        + 0.045 * Math.sin(angle * 5 + boundary.p2)
+        + 0.030 * Math.sin(angle * 9 + boundary.p3);
+
+      if (r > boundary.radius * wobble) return false;
+
+      // One or two broad bites in the fringe keep the silhouette from
+      // settling into a clean disc.
+      if (r > boundary.radius * 0.68) {
+        for (const gap of boundary.gaps) {
+          const delta = Math.atan2(
+            Math.sin(angle - gap.angle),
+            Math.cos(angle - gap.angle)
+          );
+          if (Math.abs(delta) < gap.width * 0.5) return false;
+        }
+      }
+
+      return true;
+    }
+
+    function edgeDropChance(x, z, radius) {
+      const t = Math.hypot(x, z) / radius;
+      if (t <= 0.76) return 0;
+      return Math.pow(clamp((t - 0.76) / 0.32, 0, 1), 2) * 0.28;
+    }
+
+    /* ------------------------- lot subdivision ---------------------------- */
+
+    function subdivide(rect, rng, lots, depth = 0) {
+      const area = rect.w * rect.d;
+      const minSide = Math.min(rect.w, rect.d);
+
+      if (
+        depth >= 3
+        || area < 1100
+        || minSide < 17
+        || lots.length >= 10
+        || rng() < 0.07
+      ) {
+        lots.push(rect);
+        return;
+      }
+
+      const splitX = rect.w > rect.d ? rng() < 0.80 : rng() < 0.20;
+      const gap = 2.2 + rng() * 7.5;
+      const ratio = 0.35 + rng() * 0.30;
+
+      if (splitX) {
+        const usable = rect.w - gap;
+        if (usable < 28) {
+          lots.push(rect);
+          return;
+        }
+
+        const w1 = usable * ratio;
+        const w2 = usable - w1;
+        if (w1 < 13 || w2 < 13) {
+          lots.push(rect);
+          return;
+        }
+
+        subdivide({ x: rect.x, z: rect.z, w: w1, d: rect.d }, rng, lots, depth + 1);
+        subdivide({ x: rect.x + w1 + gap, z: rect.z, w: w2, d: rect.d }, rng, lots, depth + 1);
+      } else {
+        const usable = rect.d - gap;
+        if (usable < 28) {
+          lots.push(rect);
+          return;
+        }
+
+        const d1 = usable * ratio;
+        const d2 = usable - d1;
+        if (d1 < 13 || d2 < 13) {
+          lots.push(rect);
+          return;
+        }
+
+        subdivide({ x: rect.x, z: rect.z, w: rect.w, d: d1 }, rng, lots, depth + 1);
+        subdivide({ x: rect.x, z: rect.z + d1 + gap, w: rect.w, d: d2 }, rng, lots, depth + 1);
+      }
+    }
+
+    /* ---------------------------- city generator -------------------------- */
+
+    function generateCity(seed, sizeKey) {
+      const preset = CITY_PRESETS[sizeKey];
+      const rng = mulberry32(hashString(`${seed}:${sizeKey}:v3`));
+      const R = preset.radius;
+
+      const districts = makeDistricts(preset, rng);
+      const avenues = makeAvenues(R, preset.avenues, rng);
+      const centers = makeCenters(preset, rng);
+      const boundary = makeBoundary(R, rng);
+      const park = makePark(preset, rng);
+
+      const buildings = [];
+      const districtsUsed = new Set();
+      let blocksUsed = 0;
+
+      for (const district of districts) {
+        const xAxis = makeLocalAxis(district.extent, district.block, rng);
+        const zAxis = makeLocalAxis(district.extent, district.block, rng);
+        const cos = Math.cos(district.angle);
+        const sin = Math.sin(district.angle);
+
+        for (let ix = 0; ix < xAxis.length - 1; ix++) {
+          const x0 = xAxis[ix].pos + xAxis[ix].width / 2 + 1.2;
+          const x1 = xAxis[ix + 1].pos - xAxis[ix + 1].width / 2 - 1.2;
+          if (x1 - x0 < 16) continue;
+
+          for (let iz = 0; iz < zAxis.length - 1; iz++) {
+            const z0 = zAxis[iz].pos + zAxis[iz].width / 2 + 1.2;
+            const z1 = zAxis[iz + 1].pos - zAxis[iz + 1].width / 2 - 1.2;
+            if (z1 - z0 < 16) continue;
+
+            const localBlockX = (x0 + x1) / 2;
+            const localBlockZ = (z0 + z1) / 2;
+            const blockX = district.x + localBlockX * cos + localBlockZ * sin;
+            const blockZ = district.z - localBlockX * sin + localBlockZ * cos;
+
+            if (!insideCity(blockX, blockZ, boundary)) continue;
+
+            const blockAssignment = nearestDistricts(blockX, blockZ, districts);
+            if (blockAssignment.index !== district.index) continue;
+            if (rng() < 0.030) continue; // small plazas / courtyards
+            if (rng() < edgeDropChance(blockX, blockZ, R)) continue;
+
+            blocksUsed++;
+            districtsUsed.add(district.index);
+
+            const lots = [];
+            subdivide({ x: x0, z: z0, w: x1 - x0, d: z1 - z0 }, rng, lots);
+
+            for (const lot of lots) {
+              if (rng() < 0.045) continue;
+
+              const w = lot.w * (0.58 + rng() * 0.34);
+              const d = lot.d * (0.58 + rng() * 0.34);
+              if (w < 4.5 || d < 4.5) continue;
+
+              const spareX = lot.w - w;
+              const spareZ = lot.d - d;
+              const localX = lot.x + w / 2 + (rng() - 0.5) * spareX * 0.60;
+              const localZ = lot.z + d / 2 + (rng() - 0.5) * spareZ * 0.60;
+
+              const x = district.x + localX * cos + localZ * sin;
+              const z = district.z - localX * sin + localZ * cos;
+
+              if (!insideCity(x, z, boundary)) continue;
+              if (insidePark(x, z, park)) continue;
+
+              const assignment = nearestDistricts(x, z, districts);
+              if (assignment.index !== district.index) continue;
+
+              const boundingRadius = Math.hypot(w, d) * 0.5;
+
+              // Keep a soft seam between districts so two independently
+              // rotated grids cannot grow through each other.
+              if (assignment.secondDistance - assignment.distance < boundingRadius * 0.45) {
+                continue;
+              }
+
+              const hitsAvenue = avenues.some(
+                (avenue) => Math.abs(x * avenue.nx + z * avenue.nz - avenue.offset)
+                  < avenue.halfWidth + boundingRadius * 0.8
+              );
+              if (hitsAvenue) continue;
+
+              const rotation = district.angle
+                + (rng() < 0.16 ? (rng() - 0.5) * 0.06 : 0);
+              const core = coreAt(x, z, centers);
+              let height = (
+                6.0
+                + Math.pow(rng(), 2.2) * 14
+                + core * (13 + Math.pow(rng(), 1.4) * 37)
+              ) * preset.heightScale;
+
+              if (rng() < 0.02) height *= 1.22;
+              if (w < 9 || d < 9) height *= 1.08;
+              height = Math.max(height, 5);
+
+              buildings.push({
+                x,
+                z,
+                w,
+                d,
+                h: height,
+                rotation,
+                core,
+                district: district.index,
+                landmark: false,
+              });
+            }
+          }
+        }
+      }
+
+      /* Landmarks are promoted from well-connected downtown lots. They are
+         rare, spread out, and only moderately taller than the skyline. */
+      const candidates = buildings
+        .filter((building) => building.core > 0.28 && building.w * building.d > 200)
+        .map((building) => ({
+          building,
+          score: building.core * 120
+            + Math.min(building.w, building.d) * 0.18
+            + rng() * 22,
+        }))
+        .sort((a, b) => b.score - a.score);
+
+      const minGap = R * 0.032;
+      const chosen = [];
+
+      for (const candidate of candidates) {
+        const { building } = candidate;
+        const hasRoom = chosen.every(
+          (picked) => Math.hypot(picked.x - building.x, picked.z - building.z) > minGap
+        );
+        if (!hasRoom) continue;
+        chosen.push(building);
+        if (chosen.length === preset.landmarkCount) break;
+      }
+
+      if (chosen.length < preset.landmarkCount) {
+        for (const { building } of candidates) {
+          if (chosen.includes(building)) continue;
+          chosen.push(building);
+          if (chosen.length === preset.landmarkCount) break;
+        }
+      }
+
+      for (const building of chosen) {
+        building.landmark = true;
+        building.h = preset.landmarkMin
+          + rng() * (preset.landmarkMax - preset.landmarkMin);
+      }
+
+      // Population is independent of the geometry RNG so regenerating the
+      // same seed keeps the same city and the same population.
+      const populationRng = mulberry32(hashString(`${seed}:${sizeKey}:population:v1`));
+      const populationRaw = preset.populationMin
+        + populationRng() * (preset.populationMax - preset.populationMin + 1);
+      const population = Math.min(preset.populationMax, Math.floor(populationRaw));
+
+      // Even distribution: every building gets the same base population,
+      // with the remainder spread one person at a time across buildings.
+      const populationBase = buildings.length
+        ? Math.floor(population / buildings.length)
+        : 0;
+      const populationRemainder = buildings.length
+        ? population % buildings.length
+        : 0;
+
+      buildings.forEach((building, index) => {
+        building.population = populationBase + (index < populationRemainder ? 1 : 0);
+      });
+
+      return {
+        seed,
+        sizeKey,
+        preset,
+        buildings,
+        population,
+        populationPerBuilding: buildings.length ? population / buildings.length : 0,
+        landmarks: chosen.length,
+        blocks: blocksUsed,
+        meta: {
+          avenueCount: avenues.length,
+          centerCount: centers.length,
+          districtCount: districts.length,
+          districtsUsed: districtsUsed.size,
+          park: Boolean(park),
+        },
+      };
+    }
+
+    /* ================================================================== *
+     *  CALIBRATED BLAST / THERMAL MODEL
+     *
+     *  这一版不再使用上一版的 R98/R50 和自造 logistic 伤亡曲线。
+     *
+     *  冲击波：
+     *  - 使用 1 kt 标准地面距离表（HOB / ground range，单位 ft），
+     *    对 1、4、6、10、20 psi 五个等压线做插值；
+     *  - 5 psi 在 4 psi 和 6 psi 表之间按 psi 线性插值；
+     *  - 按立方根律缩放到目标当量：
+     *      scaledHob = HOB / cbrt(Y)
+     *      range = range_1kt(scaledHob) × cbrt(Y)
+     *  - 数据表来源：Fletcher 等人的 CEX-62.2 曲线拟合，
+     *    与 NUKEMAP 的 nukeeffects.js 使用同一组公开数据；
+     *    另参考 Glasstone & Dolan, The Effects of Nuclear Weapons (1977)。
+     *
+     *  热辐射：
+     *  - 橙色圈表示 8 cal/cm²（三度烧伤阈值）的地面半径；
+     *  - 使用 Glasstone & Dolan 图 12.65 拟合的 thermal range 曲线。
+     *
+     *  火球：
+     *  - 使用 NUKEMAP / CEX-62.2 的最大火球半径关系：
+     *      空爆：0.03788 × Y^0.4 miles
+     *      地爆：0.04924 × Y^0.4 miles
+     *
+     *  默认最佳高度：
+     *  - 取 20 psi 等压线达到最大地面距离的高度；
+     *  - 这是为了让 20/10/5/1 psi 四个圈同时存在，而不是只优化 5 psi。
+     *
+     *  这是查表 + 插值的工程模型，不是 CFD。
+     * ================================================================== */
+
+    // 1 kt 标准数据；hob 和 range 单位均为英尺。
+    // 5 psi 没有直接表项，使用 4 psi 和 6 psi 插值。
+    const BLAST_TABLE_1KT = {
+      1: {
+        hob: [0, 58, 140, 219, 322, 405, 496, 579, 678, 810, 888, 971, 1083, 1165, 1260, 1388, 1533, 1665, 1727, 1802, 1864, 1888, 1913, 1921, 1922, 1938, 2004, 2140, 2355, 2512, 2785, 3012, 3211, 3335, 3525, 3702, 3764, 3909, 4017, 4157, 4236, 4318, 4409, 4463, 4521, 4632, 4702, 4781, 4860, 4897, 4934, 4963, 4992, 5012, 5008, 5070],
+        range: [3860, 3996, 4248, 4475, 4744, 4996, 5236, 5471, 5719, 6037, 6219, 6397, 6583, 6715, 6835, 6946, 7021, 7021, 6979, 6872, 6698, 6512, 6256, 6021, 5781, 5558, 5364, 5149, 4913, 4756, 4508, 4293, 4107, 3975, 3785, 3591, 3508, 3343, 3207, 3008, 2884, 2756, 2612, 2500, 2405, 2157, 2008, 1764, 1504, 1335, 1149, 942, 760, 612, 599, 0],
+      },
+      4: {
+        hob: [0, 37, 87, 153, 244, 331, 421, 529, 661, 777, 905, 988, 1070, 1132, 1186, 1231, 1240, 1223, 1198, 1182, 1174, 1194, 1260, 1326, 1413, 1521, 1612, 1694, 1781, 1860, 1913, 1971, 2017, 2050, 2074, 2087, 2087],
+        range: [1665, 1702, 1764, 1847, 1946, 2045, 2136, 2244, 2364, 2459, 2554, 2599, 2624, 2620, 2591, 2512, 2438, 2331, 2227, 2153, 2050, 1942, 1798, 1686, 1570, 1426, 1310, 1182, 1058, 926, 810, 657, 496, 343, 182, 62, 0],
+      },
+      6: {
+        hob: [0, 62, 120, 202, 273, 364, 434, 500, 595, 686, 777, 888, 979, 1041, 1083, 1095, 1079, 1054, 1025, 1025, 1033, 1074, 1145, 1227, 1310, 1368, 1421, 1488, 1537, 1570, 1570, 1603, 1628, 1645, 1653, 1653],
+        range: [1339, 1393, 1438, 1500, 1554, 1624, 1682, 1740, 1822, 1893, 1959, 2012, 2017, 1988, 1926, 1843, 1756, 1669, 1570, 1508, 1450, 1360, 1240, 1132, 1008, 926, 847, 723, 603, 512, 492, 384, 256, 124, 37, 0],
+      },
+      10: {
+        hob: [0, 30, 73, 115, 151, 191, 235, 269, 312, 345, 380, 412, 442, 471, 500, 528, 558, 592, 627, 658, 692, 724, 749, 767, 785, 805, 820, 835, 851, 862, 872, 881, 888, 893, 896, 894, 888, 881, 872, 859, 850, 846, 848, 852, 858, 867, 880, 891, 904, 916, 926, 941, 953, 965, 980, 989, 1000, 1017, 1045, 1074, 1103, 1136, 1169, 1190, 1215, 1236, 1244, 1252, 1260],
+        range: [1024, 1037, 1056, 1074, 1092, 1112, 1133, 1151, 1173, 1193, 1214, 1238, 1261, 1285, 1312, 1336, 1360, 1387, 1412, 1430, 1447, 1455, 1455, 1450, 1443, 1433, 1422, 1407, 1388, 1370, 1348, 1320, 1291, 1265, 1246, 1227, 1196, 1173, 1148, 1119, 1097, 1065, 1047, 1026, 1007, 983, 957, 934, 911, 890, 874, 852, 833, 814, 795, 778, 765, 740, 690, 636, 583, 512, 450, 380, 293, 211, 128, 58, 0],
+      },
+      20: {
+        hob: [0, 34, 84, 130, 176, 223, 274, 319, 358, 399, 427, 458, 485, 512, 537, 566, 597, 627, 651, 673, 687, 694, 692, 683, 674, 672, 672, 677, 685, 697, 713, 730, 748, 764, 781, 801, 814, 827, 844, 858, 870, 881, 892, 898, 906, 912, 919, 922, 924],
+        range: [714, 719, 727, 737, 747, 757, 771, 782, 795, 812, 826, 843, 860, 879, 898, 914, 922, 919, 907, 887, 860, 826, 788, 757, 729, 704, 686, 662, 639, 612, 586, 559, 533, 508, 478, 446, 419, 394, 358, 327, 297, 269, 232, 205, 165, 124, 68, 26, 0],
+      },
+    };
+
+    const FEET_TO_METERS = 0.3048;
+    const MILES_TO_METERS = 1609.344;
+    const THERMAL_RING_CAL_CM2 = 8;
+    const BLAST_PSI_LEVELS = [20, 10, 5, 1];
+    const THERMAL_EQ_2_108 = [-0.0193419, -0.4804553, -0.0055685, 0.0002013];
+
+    function logPoly10(x, args) {
+      const logX = Math.log10(x);
+      let logResult = 0;
+      for (let i = 0; i < args.length; i++) {
+        logResult += args[i] * Math.pow(logX, i);
+      }
+      return Math.pow(10, logResult);
+    }
+
+    function rangeAtHob1Kt(psi, hobFeet) {
+      const table = BLAST_TABLE_1KT[psi];
+      if (!table) return 0;
+      if (hobFeet <= table.hob[0]) return table.range[0];
+      if (hobFeet >= table.hob[table.hob.length - 1]) return 0;
+
+      for (let i = 0; i < table.hob.length - 1; i++) {
+        const h0 = table.hob[i];
+        const h1 = table.hob[i + 1];
+        if (hobFeet >= h0 && hobFeet <= h1) {
+          if (h1 === h0) return table.range[i];
+          const t = (hobFeet - h0) / (h1 - h0);
+          return table.range[i] + (table.range[i + 1] - table.range[i]) * t;
+        }
+      }
+      return 0;
+    }
+
+    function range5PsiAtHob1Kt(hobFeet) {
+      return (rangeAtHob1Kt(4, hobFeet) + rangeAtHob1Kt(6, hobFeet)) / 2;
+    }
+
+    function rangeForPsiAtHob1Kt(psi, hobFeet) {
+      if (psi === 5) return range5PsiAtHob1Kt(hobFeet);
+      return rangeAtHob1Kt(psi, hobFeet);
+    }
+
+    function scaledHobForYield(hobMeters, yieldKt) {
+      return (hobMeters / FEET_TO_METERS) / Math.cbrt(yieldKt);
+    }
+
+    function blastRadiusAtHob(psi, yieldKt, hobMeters) {
+      const scale = Math.cbrt(yieldKt);
+      const hobFeet = scaledHobForYield(hobMeters, yieldKt);
+      const range1KtFeet = rangeForPsiAtHob1Kt(psi, hobFeet);
+      return range1KtFeet * scale * FEET_TO_METERS;
+    }
+
+    function fireballRadiusForYield(yieldKt, burstType) {
+      const miles = (burstType === "ground" ? 0.04924 : 0.03788)
+        * Math.pow(yieldKt, 0.4);
+      return miles * MILES_TO_METERS;
+    }
+
+    function thermalRadiusFor8Cal(yieldKt, hobMeters, burstType) {
+      const airburst = burstType !== "ground" && hobMeters > 0;
+      const input = THERMAL_RING_CAL_CM2 / (airburst ? yieldKt : 0.7 * yieldKt);
+      const slantMiles = logPoly10(input, THERMAL_EQ_2_108);
+
+      if (!airburst) {
+        return slantMiles * MILES_TO_METERS;
+      }
+
+      const hobMiles = hobMeters / MILES_TO_METERS;
+      if (slantMiles <= hobMiles) return 0;
+      return Math.sqrt(slantMiles * slantMiles - hobMiles * hobMiles)
+        * MILES_TO_METERS;
+    }
+
+    function findOptimalScaledHob(psi = 20) {
+      const table = BLAST_TABLE_1KT[psi];
+      let bestRange = -1;
+      let bestHob = 0;
+
+      for (let i = 0; i < table.hob.length; i++) {
+        const range = table.range[i];
+        if (range > bestRange) {
+          bestRange = range;
+          bestHob = table.hob[i];
+        }
+      }
+
+      return bestHob;
+    }
+
+    // 20 psi 圈达到最大地面距离的 1 kt 比例高度（597 ft）。
+    // 用 20 psi 而不是 5 psi 作为默认，是为了让四个圈都出现在地面上。
+    const OPTIMAL_20PSI_HOB_METERS_1KT =
+      findOptimalScaledHob(20) * FEET_TO_METERS;
+
+    function optimalHobForYield(yieldKt) {
+      return clamp(
+        OPTIMAL_20PSI_HOB_METERS_1KT * Math.cbrt(yieldKt),
+        100,
+        6000
+      );
+    }
+
+    function areaKm2FromRadius(radiusMeters) {
+      return Math.PI * Math.pow(radiusMeters / 1000, 2);
+    }
+
+    function formatDistance(meters) {
+      if (!Number.isFinite(meters) || meters <= 0) return "—";
+      if (meters >= 1000) return `${(meters / 1000).toFixed(1)} km`;
+      return `${Math.round(meters)} m`;
+    }
+
+    class NuclearBomb {
+      constructor({
+        x = 0,
+        z = 0,
+        yieldKt = 100,
+        hob = null,
+        burstType = "air",
+      } = {}) {
+        this.x = x;
+        this.z = z;
+        this.yieldKt = yieldKt;
+        this.hobOpt = optimalHobForYield(yieldKt);
+        this.burstType = burstType;
+        this.hob = burstType === "ground"
+          ? 0
+          : (hob == null ? this.hobOpt : hob);
+
+        this.updateModel();
+      }
+
+      updateModel() {
+        this.hobOpt = optimalHobForYield(this.yieldKt);
+        this.fireballRadius = fireballRadiusForYield(
+          this.yieldKt,
+          this.burstType
+        );
+        this.fireballGroundRadius = this.hob < this.fireballRadius
+          ? Math.sqrt(
+            this.fireballRadius * this.fireballRadius
+            - this.hob * this.hob
+          )
+          : 0;
+
+        this.r20 = blastRadiusAtHob(20, this.yieldKt, this.hob);
+        this.r10 = blastRadiusAtHob(10, this.yieldKt, this.hob);
+        this.r5 = blastRadiusAtHob(5, this.yieldKt, this.hob);
+        this.r1 = blastRadiusAtHob(1, this.yieldKt, this.hob);
+        this.onePsiAreaKm2 = areaKm2FromRadius(this.r1);
+        this.thermalRadius = thermalRadiusFor8Cal(
+          this.yieldKt,
+          this.hob,
+          this.burstType
+        );
+        this.craterRadius = this.burstType === "ground"
+          ? clamp(80 * Math.cbrt(this.yieldKt), 30, 800)
+          : 0;
+
+        return this;
+      }
+
+      blastRadius(psi) {
+        return blastRadiusAtHob(psi, this.yieldKt, this.hob);
+      }
+
+      get summary() {
+        return {
+          yieldKt: this.yieldKt,
+          hob: this.hob,
+          hobOpt: this.hobOpt,
+          burstType: this.burstType,
+          fireballRadius: this.fireballRadius,
+          fireballGroundRadius: this.fireballGroundRadius,
+          r20: this.r20,
+          r10: this.r10,
+          r5: this.r5,
+          r1: this.r1,
+          onePsiAreaKm2: this.onePsiAreaKm2,
+          thermalRadius: this.thermalRadius,
+          craterRadius: this.craterRadius,
+        };
+      }
+    }
+
+    const cityGroup = new THREE.Group();
+    cityGroup.name = "city";
+    scene.add(cityGroup);
+
+    let cityMesh = null;
+    let currentSize = "medium";
+    let simulationReady = false;
+    let activeCity = null;
+    let activeCityMesh = null;
+
+    function configureScene(preset, fitCamera) {
+      const R = preset.radius;
+
+      scene.fog.near = R * 2.0;
+      scene.fog.far = R * 5.0;
+
+      camera.near = 1;
+      camera.far = R * 12 + 8000;
+      camera.updateProjectionMatrix();
+
+      if (fitCamera) {
+        const distance = R * 1.65;
+        const elevation = THREE.MathUtils.degToRad(18);
+        const azimuth = THREE.MathUtils.degToRad(38);
+        const horizontal = Math.cos(elevation) * distance;
+
+        camera.position.set(
+          Math.sin(azimuth) * horizontal,
+          Math.sin(elevation) * distance,
+          Math.cos(azimuth) * horizontal
+        );
+
+        controls.target.set(0, R * 0.020, 0);
+        controls.minDistance = R * 0.22;
+        controls.maxDistance = R * 6.2;
+        controls.update();
+      }
+
+      // A low-ish key light gives the plaster blocks a readable shadow side.
+      keyLight.position.set(-R * 1.55, R * 0.95, R * 1.18);
+      keyLight.target.position.set(0, 0, 0);
+
+      const shadow = keyLight.shadow;
+      const shadowCamera = shadow.camera;
+      const extent = R * 1.30;
+
+      shadowCamera.left = -extent;
+      shadowCamera.right = extent;
+      shadowCamera.top = extent;
+      shadowCamera.bottom = -extent;
+      shadowCamera.near = R * 0.35;
+      shadowCamera.far = R * 6.0;
+      shadowCamera.updateProjectionMatrix();
+
+      shadow.bias = -0.00012;
+      shadow.normalBias = 0.42;
+      shadow.radius = 4;
+
+      if (shadow.map && shadow.mapSize.x !== preset.shadowMap) {
+        shadow.map.dispose();
+        shadow.map = null;
+      }
+      shadow.mapSize.set(preset.shadowMap, preset.shadowMap);
+      renderer.shadowMap.needsUpdate = true;
+    }
+
+    /* ------------------------------ city mesh ------------------------------ */
+
+    function formatPopulation(value) {
+      return populationFormatter.format(Math.max(0, Math.round(value)));
+    }
+
+    function renderPopulation() {
+      populationTotalEl.textContent = formatPopulation(populationState.total);
+      populationAliveEl.textContent = formatPopulation(populationState.alive);
+      populationInjuredEl.textContent = formatPopulation(populationState.injured);
+      populationDeadEl.textContent = formatPopulation(populationState.dead);
+
+      if (window.__CITY_STATE__) {
+        window.__CITY_STATE__.population = { ...populationState };
+      }
+    }
+
+    function resetPopulation(total) {
+      populationState.total = Math.max(0, Math.round(total));
+      populationState.alive = populationState.total;
+      populationState.injured = 0;
+      populationState.dead = 0;
+      renderPopulation();
+    }
+
+    // Kept as a small public hook for the next stage: blast / casualty
+    // calculations can update the three counters without touching the UI.
+    function setCasualties({ alive, injured, dead } = {}) {
+      if (Number.isFinite(alive)) {
+        populationState.alive = Math.max(0, Math.round(alive));
+      }
+      if (Number.isFinite(injured)) {
+        populationState.injured = Math.max(0, Math.round(injured));
+      }
+      if (Number.isFinite(dead)) {
+        populationState.dead = Math.max(0, Math.round(dead));
+      }
+      renderPopulation();
+    }
+
+    function updateHud(city) {
+      const preset = city.preset;
+      sizeLabelEl.textContent = preset.label;
+      countEl.textContent = city.buildings.length.toLocaleString("en-US");
+      landmarkEl.textContent = String(city.landmarks).padStart(2, "0");
+      areaEl.textContent = preset.area.toFixed(1);
+      seedEl.textContent = city.seed;
+      document.title = `${preset.label} / MICRO CITY ${city.seed}`;
+
+      sizeButtons.forEach((button) => {
+        button.setAttribute(
+          "aria-pressed",
+          String(button.dataset.size === city.sizeKey)
+        );
+      });
+    }
+
+    function updateUrl(city) {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set("size", city.sizeKey);
+        url.searchParams.set("seed", city.seed);
+        window.history.replaceState(null, "", url);
+      } catch {
+        // file:// in some browsers disallows history changes — harmless.
+      }
+    }
+
+    function setCity(sizeKey, seed, fitCamera) {
+      const preset = CITY_PRESETS[sizeKey];
+      if (!preset) return;
+
+      currentSize = sizeKey;
+
+      configureScene(preset, fitCamera);
+      const city = generateCity(seed, sizeKey);
+
+      if (cityMesh) {
+        cityGroup.remove(cityMesh);
+        cityMesh.dispose();
+      }
+
+      const mesh = new THREE.InstancedMesh(
+        buildingGeometry,
+        buildingMaterial,
+        city.buildings.length
+      );
+      mesh.name = "city-buildings";
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+
+      const dummy = new THREE.Object3D();
+      city.buildings.forEach((building, index) => {
+        dummy.position.set(building.x, 0, building.z);
+        dummy.rotation.set(0, building.rotation || 0, 0);
+        dummy.scale.set(building.w, building.h, building.d);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(index, dummy.matrix);
+      });
+
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+      cityGroup.add(mesh);
+      cityMesh = mesh;
+      initializeCityDamage(city, mesh);
+      renderer.shadowMap.needsUpdate = true;
+
+      updateHud(city);
+      resetPopulation(city.population);
+      updateUrl(city);
+
+      window.__CITY_READY__ = true;
+      window.__CITY_LAST__ = city;
+      window.__CITY_STATE__ = {
+        seed: city.seed,
+        size: city.sizeKey,
+        buildings: city.buildings.length,
+        landmarks: city.landmarks,
+        blocks: city.blocks,
+        population: { ...populationState },
+        populationPerBuilding: city.populationPerBuilding,
+        preset,
+      };
+
+      if (simulationReady) {
+        resetScenarioForCity(city);
+      }
+
+      return city;
+    }
+
+    /* ================================================================== *
+     *  NUCLEAR SCENARIO / SINGLE BOMB PROTOTYPE
+     * ================================================================== */
+
+    let bomb = null;
+    let warheads = [];
+    let selectedWarheadId = null;
+    let nextWarheadId = 1;
+    let maxWarheads = window.innerWidth <= 760 ? 3 : 6;
+    let blastEffectsList = [];
+    let shockwaveEffects = [];
+    let craterEffects = [];
+    let warheadMarkers = new Map();
+    let simulationDetonated = false;
+    let simulationPaused = true;
+    let simulationTime = 0;
+    let simulationTimeScale = 1;
+    let currentYieldKt = 100;
+    let currentHob = optimalHobForYield(100);
+    let currentBurstType = "air";
+    let autoHob = true;
+    let lastFrameTimestamp = null;
+
+    function getSelectedWarhead() {
+      return warheads.find((item) => item.id === selectedWarheadId)
+        || warheads[0]
+        || null;
+    }
+
+    function warheadLabel(warhead) {
+      const index = warheads.indexOf(warhead);
+      return index >= 0 ? `W${index + 1}` : "W—";
+    }
+
+    function syncSelectedState() {
+      const selected = getSelectedWarhead();
+      if (!selected) return;
+      selectedWarheadId = selected.id;
+      bomb = selected;
+      currentYieldKt = selected.yieldKt;
+      currentHob = selected.hob;
+      currentBurstType = selected.burstType;
+      autoHob = selected.autoHob !== false;
+    }
+
+    function currentWarheadTemplate() {
+      const selected = getSelectedWarhead();
+      if (!selected) {
+        return {
+          yieldKt: 100,
+          burstType: "air",
+          hob: optimalHobForYield(100),
+          autoHob: true,
+        };
+      }
+      return {
+        yieldKt: selected.yieldKt,
+        burstType: selected.burstType,
+        hob: selected.burstType === "ground"
+          ? 0
+          : selected.autoHob
+            ? optimalHobForYield(selected.yieldKt)
+            : selected.hob,
+        autoHob: selected.autoHob !== false,
+      };
+    }
+
+    function removeWarheadMarker(warhead) {
+      if (!warhead.marker) return;
+      warhead.marker.traverse((object) => {
+        if (object.geometry) object.geometry.dispose();
+        if (object.material) object.material.dispose();
+      });
+      warhead.marker.removeFromParent();
+      warhead.marker = null;
+      warheadMarkers.delete(warhead.id);
+    }
+
+    function addWarhead({
+      x = 0,
+      z = 0,
+      yieldKt = 100,
+      hob = null,
+      burstType = "air",
+      autoHobMode = true,
+      select = true,
+    } = {}) {
+      if (warheads.length >= maxWarheads) return null;
+
+      const resolvedHob = burstType === "ground"
+        ? 0
+        : (hob == null ? optimalHobForYield(yieldKt) : hob);
+      const warhead = new NuclearBomb({
+        x,
+        z,
+        yieldKt,
+        hob: resolvedHob,
+        burstType,
+      });
+      warhead.id = nextWarheadId++;
+      warhead.autoHob = Boolean(autoHobMode);
+      warhead.marker = null;
+      warheads.push(warhead);
+
+      if (select) {
+        selectedWarheadId = warhead.id;
+        syncSelectedState();
+      }
+      return warhead;
+    }
+
+    function updateWarheadMarkers() {
+      const cityRadius = window.__CITY_LAST__?.preset?.radius ?? 3000;
+      const baseScale = Math.max(40, cityRadius * 0.018);
+      for (const warhead of warheads) {
+        if (!warhead.marker) {
+          warhead.marker = createBombMarker();
+          warheadMarkers.set(warhead.id, warhead.marker);
+        }
+        warhead.marker.position.set(warhead.x, 0.8, warhead.z);
+        const selected = warhead.id === selectedWarheadId;
+        warhead.marker.scale.setScalar(baseScale * (selected ? 1.22 : 0.86));
+        warhead.marker.visible = !simulationDetonated;
+      }
+    }
+
+    function renderWarheadList() {
+      if (!warheadListEl) return;
+      warheadListEl.innerHTML = "";
+      warheads.forEach((warhead, index) => {
+        const row = document.createElement("div");
+        row.className = "warhead-row"
+          + (warhead.id === selectedWarheadId ? " selected" : "");
+
+        const pick = document.createElement("button");
+        pick.type = "button";
+        pick.className = "warhead-pick";
+        pick.dataset.warheadId = String(warhead.id);
+        pick.innerHTML = `<b>W${index + 1}</b><span>`
+          + `${formatYield(warhead.yieldKt)} · `
+          + `${warhead.burstType === "ground" ? "地爆" : "空爆"}`
+          + `</span>`;
+        pick.addEventListener("click", () => {
+          setSelectedWarhead(warhead.id);
+        });
+
+        const deleteButton = document.createElement("button");
+        deleteButton.type = "button";
+        deleteButton.className = "warhead-delete";
+        deleteButton.textContent = "×";
+        deleteButton.title = `移除 W${index + 1}`;
+        deleteButton.setAttribute("aria-label", `移除 W${index + 1}`);
+        deleteButton.addEventListener("click", (event) => {
+          event.stopPropagation();
+          removeWarheadById(warhead.id);
+        });
+
+        row.appendChild(pick);
+        row.appendChild(deleteButton);
+        warheadListEl.appendChild(row);
+      });
+
+      if (warheadCountEl) {
+        warheadCountEl.textContent = `${warheads.length} / ${maxWarheads}`;
+      }
+      if (addWarheadButton) {
+        addWarheadButton.disabled = warheads.length >= maxWarheads;
+      }
+    }
+
+    function setSelectedWarhead(id) {
+      if (!warheads.some((warhead) => warhead.id === id)) return;
+      selectedWarheadId = id;
+      syncSelectedState();
+      renderWarheadList();
+      updateNukeUI();
+      updateWarheadMarkers();
+      syncEffectsSelection();
+    }
+
+    function removeWarheadById(id) {
+      if (warheads.length <= 1) return;
+      const index = warheads.findIndex((warhead) => warhead.id === id);
+      if (index < 0) return;
+
+      const [removed] = warheads.splice(index, 1);
+      removeWarheadMarker(removed);
+
+      if (selectedWarheadId === id) {
+        const next = warheads[Math.min(index, warheads.length - 1)];
+        selectedWarheadId = next.id;
+      }
+      syncSelectedState();
+      resetBlastState();
+      renderWarheadList();
+      updateNukeUI();
+      updateWarheadMarkers();
+      syncEffectsSelection();
+    }
+
+    function addWarheadNearCenter() {
+      if (warheads.length >= maxWarheads) return;
+      const cityRadius = window.__CITY_LAST__?.preset?.radius ?? 3000;
+      const template = currentWarheadTemplate();
+      const seat = warheads.length;
+      const angle = seat * 2.399963;
+      const radius = cityRadius * 0.16 * Math.sqrt(seat + 0.6);
+      const warhead = addWarhead({
+        x: Math.cos(angle) * radius,
+        z: Math.sin(angle) * radius,
+        yieldKt: template.yieldKt,
+        hob: template.hob,
+        burstType: template.burstType,
+        autoHobMode: template.autoHob,
+      });
+      if (!warhead) return;
+      resetBlastState();
+      renderWarheadList();
+      updateNukeUI();
+      updateWarheadMarkers();
+      syncEffectsSelection();
+    }
+
+    function makeMirvArray() {
+      const cityRadius = window.__CITY_LAST__?.preset?.radius ?? 3000;
+      const template = currentWarheadTemplate();
+      const count = maxWarheads;
+
+      for (const warhead of warheads) removeWarheadMarker(warhead);
+      warheads = [];
+      selectedWarheadId = null;
+
+      const radius = cityRadius * 0.42;
+      for (let i = 0; i < count; i++) {
+        const angle = -Math.PI / 2 + (i / count) * Math.PI * 2;
+        addWarhead({
+          x: Math.cos(angle) * radius,
+          z: Math.sin(angle) * radius,
+          yieldKt: template.yieldKt,
+          hob: template.hob,
+          burstType: template.burstType,
+          autoHobMode: template.autoHob,
+          select: false,
+        });
+      }
+
+      selectedWarheadId = warheads[0]?.id ?? null;
+      syncSelectedState();
+      resetBlastState();
+      renderWarheadList();
+      updateNukeUI();
+      updateWarheadMarkers();
+      syncEffectsSelection();
+    }
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let placementPointer = null;
+
+    function smoothstep(edge0, edge1, value) {
+      const t = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+      return t * t * (3 - 2 * t);
+    }
+
+    function easeOutCubic(value) {
+      return 1 - Math.pow(1 - clamp(value, 0, 1), 3);
+    }
+
+    function createGlowTexture() {
+      const size = 128;
+      const canvasTexture = document.createElement("canvas");
+      canvasTexture.width = size;
+      canvasTexture.height = size;
+
+      const context = canvasTexture.getContext("2d");
+      const center = size / 2;
+      const gradient = context.createRadialGradient(
+        center, center, 0,
+        center, center, center
+      );
+      gradient.addColorStop(0, "rgba(255, 224, 145, 0.95)");
+      gradient.addColorStop(0.22, "rgba(255, 160, 55, 0.72)");
+      gradient.addColorStop(0.58, "rgba(255, 110, 25, 0.20)");
+      gradient.addColorStop(1, "rgba(255, 90, 20, 0)");
+
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, size, size);
+
+      const texture = new THREE.CanvasTexture(canvasTexture);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.needsUpdate = true;
+      return texture;
+    }
+
+    function createFireballTexture() {
+      const size = 256;
+      const canvasTexture = document.createElement("canvas");
+      canvasTexture.width = size;
+      canvasTexture.height = size;
+
+      const context = canvasTexture.getContext("2d");
+      const vertical = context.createLinearGradient(0, 0, 0, size);
+      vertical.addColorStop(0, "#fff1b8");
+      vertical.addColorStop(0.34, "#ffb347");
+      vertical.addColorStop(0.72, "#ff7b1f");
+      vertical.addColorStop(1, "#d93e00");
+      context.fillStyle = vertical;
+      context.fillRect(0, 0, size, size);
+
+      const highlight = context.createRadialGradient(
+        size * 0.38, size * 0.28, 0,
+        size * 0.38, size * 0.28, size * 0.62
+      );
+      highlight.addColorStop(0, "rgba(255, 255, 226, 0.94)");
+      highlight.addColorStop(0.24, "rgba(255, 228, 142, 0.36)");
+      highlight.addColorStop(0.72, "rgba(255, 126, 15, 0.10)");
+      highlight.addColorStop(1, "rgba(255, 90, 0, 0)");
+      context.fillStyle = highlight;
+      context.fillRect(0, 0, size, size);
+
+      const texture = new THREE.CanvasTexture(canvasTexture);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.needsUpdate = true;
+      return texture;
+    }
+
+    class BlastEffects {
+      constructor(bombInstance, selected = true) {
+        this.bomb = bombInstance;
+        this.selected = selected;
+        this.root = new THREE.Group();
+        this.root.name = "blast-effects";
+        this.root.position.set(bombInstance.x, 0, bombInstance.z);
+        this.labels = [];
+        this.ringMaterials = [];
+        scene.add(this.root);
+
+        this.buildRingsAndLabels();
+        this.setSelected(selected);
+        this.buildFireball();
+      }
+
+      buildRingsAndLabels() {
+        const bomb = this.bomb;
+        const narrow = window.innerWidth <= 1500;
+        const rings = [
+          {
+            radius: bomb.r20,
+            kind: "r20",
+            color: 0x2f6fed,
+            opacity: 0.52,
+            angle: 0.28,
+            labelRadius: bomb.r20 * 1.28,
+            mini: true,
+            leader: false,
+            headline: "20 psi",
+            detail: `重型毁伤 · ${formatDistance(bomb.r20)}`,
+            note: "",
+          },
+          {
+            radius: bomb.r10,
+            kind: "r10",
+            color: 0x2f6fed,
+            opacity: 0.60,
+            angle: 0.86,
+            labelRadius: bomb.r10 * 1.20,
+            mini: true,
+            leader: false,
+            headline: "10 psi",
+            detail: `多数倒塌 · ${formatDistance(bomb.r10)}`,
+            note: "",
+          },
+          {
+            radius: bomb.r5,
+            kind: "r5",
+            color: 0x2f6fed,
+            opacity: 0.68,
+            angle: 1.44,
+            labelRadius: bomb.r5 * 1.12,
+            mini: true,
+            leader: false,
+            headline: "5 psi",
+            detail: `大量倒塌 · ${formatDistance(bomb.r5)}`,
+            note: "",
+          },
+          {
+            radius: bomb.thermalRadius,
+            kind: "thermal",
+            color: 0xe07a1f,
+            opacity: 0.86,
+            angle: narrow ? 0.55 : 1.98,
+            labelRadius: bomb.thermalRadius * (narrow ? 0.92 : 1.04),
+            mini: false,
+            leader: true,
+            headline: "热辐射",
+            detail: `8 cal/cm² · ${formatDistance(bomb.thermalRadius)}`,
+            note: "三度烧伤阈值",
+          },
+          {
+            radius: bomb.r1,
+            kind: "r1",
+            color: 0x2f6fed,
+            opacity: 0.76,
+            angle: narrow ? 2.35 : 2.78,
+            labelRadius: bomb.r1 * (narrow ? 0.92 : 1.07),
+            mini: false,
+            leader: !narrow,
+            headline: "1 psi · 最大破坏半径",
+            detail: `R ${formatDistance(bomb.r1)}`,
+            note: `圈面积 ${bomb.onePsiAreaKm2.toFixed(1)} km²`,
+          },
+        ];
+
+        for (const ring of rings) {
+          if (!Number.isFinite(ring.radius) || ring.radius <= 0) continue;
+
+          const points = [];
+          const segments = 256;
+          for (let i = 0; i < segments; i++) {
+            const angle = (i / segments) * TAU;
+            points.push(new THREE.Vector3(
+              Math.cos(angle) * ring.radius,
+              2,
+              Math.sin(angle) * ring.radius
+            ));
+          }
+
+          const ringGeometry = new THREE.BufferGeometry().setFromPoints(points);
+          const ringMaterial = new THREE.LineBasicMaterial({
+            color: ring.color,
+            transparent: true,
+            opacity: ring.opacity,
+            depthTest: false,
+            depthWrite: false,
+            fog: false,
+            toneMapped: false,
+          });
+          const ringLine = new THREE.LineLoop(ringGeometry, ringMaterial);
+          ringLine.renderOrder = 4;
+          this.root.add(ringLine);
+          this.ringMaterials.push({
+            material: ringMaterial,
+            opacity: ring.opacity,
+          });
+
+          const labelRadius = ring.labelRadius;
+          const anchorX = Math.cos(ring.angle) * labelRadius;
+          const anchorZ = Math.sin(ring.angle) * labelRadius;
+
+          const labelElement = document.createElement("div");
+          const classes = ["blast-label"];
+          if (ring.mini) classes.push("blast-label-mini");
+          if (ring.kind === "thermal") classes.push("blast-label-thermal");
+          if (ring.kind === "r1") classes.push("blast-label-max");
+          if (!this.selected || !labelVisibility[ring.kind]) {
+            classes.push("is-hidden");
+          }
+          labelElement.className = classes.join(" ");
+
+          const inner = document.createElement("div");
+          inner.className = "blast-label-inner";
+          inner.innerHTML =
+            `<div class="blast-label-head">${ring.headline}</div>`
+            + `<div class="blast-label-detail">${ring.detail}</div>`
+            + (ring.note
+              ? `<div class="blast-label-note">${ring.note}</div>`
+              : "");
+
+          labelElement.appendChild(inner);
+
+          const labelObject = new CSS2DObject(labelElement);
+          labelObject.position.set(anchorX, 10, anchorZ);
+          this.root.add(labelObject);
+          const labelRecord = {
+            object: labelObject,
+            element: labelElement,
+            kind: ring.kind,
+            leader: null,
+          };
+          this.labels.push(labelRecord);
+
+          if (ring.leader) {
+            const leaderGeometry = new THREE.BufferGeometry().setFromPoints([
+              new THREE.Vector3(
+                Math.cos(ring.angle) * ring.radius,
+                2,
+                Math.sin(ring.angle) * ring.radius
+              ),
+              new THREE.Vector3(anchorX, 7, anchorZ),
+            ]);
+            const leaderMaterial = new THREE.LineBasicMaterial({
+              color: ring.color,
+              transparent: true,
+              opacity: 0.66,
+              depthTest: false,
+              depthWrite: false,
+              fog: false,
+              toneMapped: false,
+            });
+            const leader = new THREE.Line(leaderGeometry, leaderMaterial);
+            leader.renderOrder = 4;
+            leader.visible = this.selected && labelVisibility[ring.kind];
+            this.root.add(leader);
+            labelRecord.leader = leader;
+          }
+        }
+      }
+
+      setSelected(selected) {
+        this.selected = selected;
+        for (const ring of this.ringMaterials) {
+          ring.material.opacity = selected
+            ? ring.opacity
+            : ring.opacity * 0.30;
+        }
+        for (const label of this.labels) {
+          const visible = this.selected && Boolean(labelVisibility[label.kind]);
+          label.element.classList.toggle("is-hidden", !visible);
+          if (label.leader) label.leader.visible = visible;
+        }
+      }
+
+      setLabelVisibility(kind, visible) {
+        for (const label of this.labels) {
+          if (label.kind !== kind) continue;
+          const shown = this.selected && visible;
+          label.element.classList.toggle("is-hidden", !shown);
+          if (label.leader) label.leader.visible = shown;
+        }
+      }
+
+      buildFireball() {
+        const group = new THREE.Group();
+        const centerY = this.bomb.hob <= 0
+          ? this.bomb.fireballRadius * 0.45
+          : this.bomb.hob;
+        group.position.y = centerY;
+
+        const sphereGeometry = new THREE.SphereGeometry(1, 48, 32);
+        const sphereMaterial = new THREE.MeshBasicMaterial({
+          map: createFireballTexture(),
+          color: 0xffffff,
+          transparent: true,
+          opacity: 1,
+          depthWrite: true,
+          fog: false,
+          toneMapped: false,
+        });
+        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+        sphere.scale.setScalar(0.05);
+        sphere.renderOrder = 2;
+        group.add(sphere);
+
+        const glowMaterial = new THREE.SpriteMaterial({
+          map: createGlowTexture(),
+          color: 0xffb45a,
+          transparent: true,
+          opacity: 0.58,
+          depthTest: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          fog: false,
+          toneMapped: false,
+        });
+        const glow = new THREE.Sprite(glowMaterial);
+        glow.scale.setScalar(this.bomb.fireballRadius * 3.0);
+        glow.renderOrder = 1;
+        group.add(glow);
+
+        this.root.add(group);
+        this.fireball = {
+          group,
+          sphere,
+          glow,
+          sphereMaterial,
+          glowMaterial,
+          radius: this.bomb.fireballRadius,
+        };
+      }
+
+      update(age) {
+        if (!this.fireball) return;
+
+        const t = Math.max(0, age);
+        const grow = easeOutCubic(clamp(t / 1.15, 0, 1));
+        const fade = 1 - smoothstep(3.8, 7.6, t);
+        const scale = this.fireball.radius * (0.05 + 0.95 * grow);
+
+        this.fireball.sphere.scale.setScalar(scale);
+        this.fireball.sphere.material.opacity = fade;
+        this.fireball.glow.scale.setScalar(scale * 3.0);
+        this.fireball.glow.material.opacity = 0.58 * fade;
+        this.fireball.group.visible = t < 8.2 && fade > 0.001;
+      }
+
+      clear() {
+        for (const label of this.labels) {
+          label.object.removeFromParent();
+          label.element.remove();
+        }
+        this.labels.length = 0;
+
+        this.root.traverse((object) => {
+          if (object.geometry) object.geometry.dispose();
+          if (object.material) {
+            if (object.material.map) object.material.map.dispose();
+            object.material.dispose();
+          }
+        });
+
+        this.root.removeFromParent();
+        this.fireball = null;
+      }
+    }
+
+    /* ================================================================== *
+     *  SHOCKWAVE VISUAL
+     *
+     *  地面冲击波由两层组成：
+     *  1. 外围一条亮色冲击锋线；
+     *  2. 锋线后方一圈半透明尘带，用 canvas 径向渐变生成。
+     *
+     *  这里使用 500 m/s 的等效传播速度，让视觉效果和建筑触发使用
+     *  同一个半径。它不是精确的冲击波到达时间表；后续可以换成
+     *  Kingery–Bulmash 的 arrival-time 曲线。
+     * ================================================================== */
+
+    function createShockwaveTexture() {
+      const size = 512;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const context = canvas.getContext("2d");
+      const center = size / 2;
+
+      context.clearRect(0, 0, size, size);
+
+      const gradient = context.createRadialGradient(
+        center, center, size * 0.28,
+        center, center, size * 0.5
+      );
+      gradient.addColorStop(0.00, "rgba(96, 86, 72, 0)");
+      gradient.addColorStop(0.62, "rgba(96, 86, 72, 0)");
+      gradient.addColorStop(0.78, "rgba(108, 96, 80, 0.08)");
+      gradient.addColorStop(0.88, "rgba(115, 102, 85, 0.28)");
+      gradient.addColorStop(0.955, "rgba(128, 114, 96, 0.52)");
+      gradient.addColorStop(0.985, "rgba(238, 231, 219, 0.64)");
+      gradient.addColorStop(1.00, "rgba(238, 231, 219, 0)");
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, size, size);
+
+      // 细小的尘埃颗粒，打破纯渐变环的塑料感。
+      for (let i = 0; i < 120; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const radius = center * (0.88 + Math.random() * 0.105);
+        const x = center + Math.cos(angle) * radius;
+        const y = center + Math.sin(angle) * radius;
+        const alpha = 0.025 + Math.random() * 0.08;
+        context.fillStyle = `rgba(112, 101, 87, ${alpha})`;
+        context.beginPath();
+        context.arc(x, y, 0.6 + Math.random() * 2.2, 0, Math.PI * 2);
+        context.fill();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.needsUpdate = true;
+      return texture;
+    }
+
+    class ShockwaveEffect {
+      constructor(bombInstance, selected = true) {
+        this.bomb = bombInstance;
+        this.selected = selected;
+        this.opacityFactor = selected ? 1 : 0.22;
+        this.speed = SHOCK_SPEED_MPS;
+        this.maxRadius = Math.max(
+          1,
+          bombInstance.r1,
+          bombInstance.r5,
+          bombInstance.thermalRadius,
+          bombInstance.fireballGroundRadius
+        );
+        this.maxTime = this.maxRadius / this.speed;
+        this.root = new THREE.Group();
+        this.root.name = "shockwave";
+        this.root.position.set(bombInstance.x, 0, bombInstance.z);
+
+        this.dustTexture = createShockwaveTexture();
+        this.dustMaterial = new THREE.MeshBasicMaterial({
+          map: this.dustTexture,
+          transparent: true,
+          opacity: 0,
+          depthTest: false,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          fog: false,
+          toneMapped: false,
+        });
+        this.dust = new THREE.Mesh(
+          new THREE.PlaneGeometry(2, 2),
+          this.dustMaterial
+        );
+        this.dust.rotation.x = -Math.PI / 2;
+        this.dust.position.y = 0.8;
+        this.dust.renderOrder = 2;
+        this.root.add(this.dust);
+
+        // 一条有宽度的浅蓝冲击带，比纯 LineBasicMaterial 更容易看见。
+        // 外围再叠一条亮色锋线，形成“宽带 + 亮边”的冲击波。
+        this.bandGeometry = new THREE.RingGeometry(0.965, 1, 256);
+        this.bandMaterial = new THREE.MeshBasicMaterial({
+          color: 0x91bcff,
+          transparent: true,
+          opacity: 0,
+          side: THREE.DoubleSide,
+          depthTest: false,
+          depthWrite: false,
+          fog: false,
+          toneMapped: false,
+        });
+        this.band = new THREE.Mesh(
+          this.bandGeometry,
+          this.bandMaterial
+        );
+        this.band.rotation.x = -Math.PI / 2;
+        this.band.position.y = 1.05;
+        this.band.renderOrder = 3;
+        this.root.add(this.band);
+
+        const points = [];
+        const segments = 256;
+        for (let i = 0; i < segments; i++) {
+          const angle = (i / segments) * TAU;
+          points.push(new THREE.Vector3(
+            Math.cos(angle),
+            0,
+            Math.sin(angle)
+          ));
+        }
+        this.frontGeometry = new THREE.BufferGeometry().setFromPoints(points);
+        this.frontMaterial = new THREE.LineBasicMaterial({
+          color: 0xfff3df,
+          transparent: true,
+          opacity: 0,
+          depthTest: false,
+          depthWrite: false,
+          fog: false,
+          toneMapped: false,
+        });
+        this.front = new THREE.LineLoop(
+          this.frontGeometry,
+          this.frontMaterial
+        );
+        this.front.position.y = 1.4;
+        this.front.renderOrder = 5;
+        this.root.add(this.front);
+
+        scene.add(this.root);
+        this.update(0);
+      }
+
+      update(time) {
+        const radius = Math.min(this.maxRadius, time * this.speed);
+        const fadeIn = clamp(time / 0.18, 0, 1);
+        const fadeOut = 1 - clamp(
+          (time - this.maxTime) / 1.15,
+          0,
+          1
+        );
+        const alpha = clamp(fadeIn * fadeOut, 0, 1);
+        const visible = radius > 1 && alpha > 0.005;
+
+        this.dust.visible = visible;
+        this.band.visible = visible;
+        this.front.visible = visible;
+        this.dustMaterial.opacity = 0.52 * alpha * this.opacityFactor;
+        this.bandMaterial.opacity = 0.50 * alpha * this.opacityFactor;
+        this.frontMaterial.opacity = 0.92 * alpha * this.opacityFactor;
+
+        this.dust.scale.set(Math.max(radius, 0.001), Math.max(radius, 0.001), 1);
+        this.band.scale.set(Math.max(radius, 0.001), Math.max(radius, 0.001), 1);
+        this.front.scale.set(Math.max(radius, 0.001), 1, Math.max(radius, 0.001));
+      }
+
+      setSelected(selected) {
+        this.selected = selected;
+        this.opacityFactor = selected ? 1 : 0.22;
+      }
+
+      clear() {
+        this.root.traverse((object) => {
+          if (object.geometry) object.geometry.dispose();
+          if (object.material) {
+            if (object.material.map) object.material.map.dispose();
+            object.material.dispose();
+          }
+        });
+        this.root.removeFromParent();
+      }
+    }
+
+    function createCraterScorchTexture() {
+      const size = 512;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const context = canvas.getContext("2d");
+      const center = size / 2;
+
+      const gradient = context.createRadialGradient(
+        center, center, 0,
+        center, center, center
+      );
+      gradient.addColorStop(0.00, "rgba(28, 24, 20, 0.58)");
+      gradient.addColorStop(0.28, "rgba(38, 32, 26, 0.50)");
+      gradient.addColorStop(0.55, "rgba(60, 52, 43, 0.30)");
+      gradient.addColorStop(0.78, "rgba(90, 80, 65, 0.13)");
+      gradient.addColorStop(0.94, "rgba(120, 108, 88, 0.04)");
+      gradient.addColorStop(1.00, "rgba(120, 108, 88, 0)");
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, size, size);
+
+      // 放射状抛射痕。
+      for (let i = 0; i < 46; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const inner = center * (0.22 + Math.random() * 0.16);
+        const outer = center * (0.72 + Math.random() * 0.25);
+        context.strokeStyle = `rgba(52, 44, 35, ${0.025 + Math.random() * 0.05})`;
+        context.lineWidth = 0.8 + Math.random() * 2.2;
+        context.beginPath();
+        context.moveTo(
+          center + Math.cos(angle) * inner,
+          center + Math.sin(angle) * inner
+        );
+        context.lineTo(
+          center + Math.cos(angle) * outer,
+          center + Math.sin(angle) * outer
+        );
+        context.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.needsUpdate = true;
+      return texture;
+    }
+
+    class CraterEffect {
+      constructor(bombInstance) {
+        this.bomb = bombInstance;
+        this.root = new THREE.Group();
+        this.root.name = "crater";
+        this.root.position.set(bombInstance.x, 0, bombInstance.z);
+
+        const radius = Math.max(30, bombInstance.craterRadius);
+        const rimHeight = Math.max(8, radius * 0.065);
+        const centerY = 0.15;
+
+        // 地面焦痕与放射状抛射痕。
+        this.scorchTexture = createCraterScorchTexture();
+        this.scorchMaterial = new THREE.MeshBasicMaterial({
+          map: this.scorchTexture,
+          transparent: true,
+          opacity: 0.92,
+          depthWrite: false,
+          depthTest: true,
+          side: THREE.DoubleSide,
+          fog: false,
+          toneMapped: false,
+        });
+        this.scorch = new THREE.Mesh(
+          new THREE.PlaneGeometry(2, 2),
+          this.scorchMaterial
+        );
+        this.scorch.rotation.x = -Math.PI / 2;
+        this.scorch.position.y = 0.06;
+        this.scorch.scale.set(radius * 2.15, radius * 2.15, 1);
+        this.scorch.renderOrder = 1;
+        this.root.add(this.scorch);
+
+        // 低矮的碗形坑体。它不是把地面网格真正挖穿，
+        // 而是用抬起的坑缘 + 深色坑底在现有地面上读成弹坑。
+        const segments = 72;
+        const rings = 16;
+        const positions = [];
+        const colors = [];
+        const indices = [];
+        const innerColor = new THREE.Color(0.13, 0.105, 0.085);
+        const rimColor = new THREE.Color(0.64, 0.58, 0.49);
+        const dustColor = new THREE.Color(0.55, 0.50, 0.43);
+        const color = new THREE.Color();
+
+        positions.push(0, centerY, 0);
+        color.copy(innerColor);
+        colors.push(color.r, color.g, color.b);
+
+        for (let ring = 1; ring <= rings; ring++) {
+          const t = ring / rings;
+          const r = radius * t;
+          const y = centerY + rimHeight * Math.pow(t, 1.85);
+          color.copy(innerColor).lerp(rimColor, Math.pow(t, 2.0));
+          for (let segment = 0; segment < segments; segment++) {
+            const angle = (segment / segments) * TAU;
+            positions.push(Math.cos(angle) * r, y, Math.sin(angle) * r);
+            colors.push(color.r, color.g, color.b);
+          }
+        }
+
+        // 坑缘到地面的外裙边，避免出现一圈硬台阶。
+        const skirtIndex = positions.length / 3;
+        for (let segment = 0; segment < segments; segment++) {
+          const angle = (segment / segments) * TAU;
+          const r = radius * 1.12;
+          positions.push(
+            Math.cos(angle) * r,
+            0.04,
+            Math.sin(angle) * r
+          );
+          colors.push(dustColor.r, dustColor.g, dustColor.b);
+        }
+
+        const row = (ring, segment) => 1 + (ring - 1) * segments + segment;
+        for (let segment = 0; segment < segments; segment++) {
+          const next = (segment + 1) % segments;
+          indices.push(0, row(1, segment), row(1, next));
+        }
+        for (let ring = 1; ring < rings; ring++) {
+          for (let segment = 0; segment < segments; segment++) {
+            const next = (segment + 1) % segments;
+            const a = row(ring, segment);
+            const b = row(ring, next);
+            const c = row(ring + 1, segment);
+            const d = row(ring + 1, next);
+            indices.push(a, c, b, b, c, d);
+          }
+        }
+        for (let segment = 0; segment < segments; segment++) {
+          const next = (segment + 1) % segments;
+          const a = row(rings, segment);
+          const b = row(rings, next);
+          const c = skirtIndex + segment;
+          const d = skirtIndex + next;
+          indices.push(a, c, b, b, c, d);
+        }
+
+        this.bowlGeometry = new THREE.BufferGeometry();
+        this.bowlGeometry.setAttribute(
+          "position",
+          new THREE.Float32BufferAttribute(positions, 3)
+        );
+        this.bowlGeometry.setAttribute(
+          "color",
+          new THREE.Float32BufferAttribute(colors, 3)
+        );
+        this.bowlGeometry.setIndex(indices);
+        this.bowlGeometry.computeVertexNormals();
+
+        this.bowlMaterial = new THREE.MeshStandardMaterial({
+          vertexColors: true,
+          roughness: 0.98,
+          metalness: 0.0,
+          side: THREE.DoubleSide,
+        });
+        this.bowl = new THREE.Mesh(this.bowlGeometry, this.bowlMaterial);
+        this.bowl.receiveShadow = true;
+        this.root.add(this.bowl);
+
+        // 坑缘的亮色轮廓，让俯视时不要只剩一块黑斑。
+        this.rimGeometry = new THREE.RingGeometry(0.93, 1.0, 96);
+        this.rimMaterial = new THREE.MeshBasicMaterial({
+          color: 0xd9d1c2,
+          transparent: true,
+          opacity: 0.46,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          depthTest: true,
+          fog: false,
+          toneMapped: false,
+        });
+        this.rim = new THREE.Mesh(this.rimGeometry, this.rimMaterial);
+        this.rim.rotation.x = -Math.PI / 2;
+        this.rim.position.y = rimHeight + 0.35;
+        this.rim.scale.set(radius, radius, 1);
+        this.rim.renderOrder = 2;
+        this.root.add(this.rim);
+
+        // 坑缘碎石/抛射物。
+        this.rockGeometry = new THREE.DodecahedronGeometry(1, 0);
+        this.rockMaterial = new THREE.MeshStandardMaterial({
+          color: 0x4b443a,
+          roughness: 1.0,
+          metalness: 0.0,
+        });
+        this.rocks = [];
+        const rockCount = 28;
+        for (let i = 0; i < rockCount; i++) {
+          const angle = this.bomb.x * 0.01 + i * 2.399;
+          const distance = radius * (0.86 + (i / rockCount) * 0.58);
+          const size = radius * (
+            i < 7
+              ? 0.038 + (i % 3) * 0.012
+              : 0.010 + (i % 4) * 0.005
+          );
+          const rock = new THREE.Mesh(this.rockGeometry, this.rockMaterial);
+          rock.position.set(
+            Math.cos(angle) * distance,
+            size * 0.45,
+            Math.sin(angle) * distance
+          );
+          rock.scale.set(
+            size,
+            size * (0.55 + (i % 3) * 0.16),
+            size * (0.72 + (i % 4) * 0.08)
+          );
+          rock.rotation.set(i * 0.7, i * 1.3, i * 0.4);
+          rock.castShadow = true;
+          rock.receiveShadow = true;
+          this.root.add(rock);
+          this.rocks.push(rock);
+        }
+
+        scene.add(this.root);
+        renderer.shadowMap.needsUpdate = true;
+      }
+
+      clear() {
+        this.bowlGeometry.dispose();
+        this.bowlMaterial.dispose();
+        this.rimGeometry.dispose();
+        this.rimMaterial.dispose();
+        this.rockGeometry.dispose();
+        this.rockMaterial.dispose();
+        this.scorch.geometry.dispose();
+        this.scorchMaterial.dispose();
+        this.scorchTexture.dispose();
+        this.root.removeFromParent();
+        this.rocks.length = 0;
+      }
+    }
+
+    function createBombMarker() {
+      const group = new THREE.Group();
+
+      const ringGeometry = new THREE.RingGeometry(0.82, 1, 64);
+      const ringMaterial = new THREE.MeshBasicMaterial({
+        color: 0x2f6fed,
+        transparent: true,
+        opacity: 0.8,
+        side: THREE.DoubleSide,
+        depthTest: false,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+      });
+      const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+      ring.rotation.x = -Math.PI / 2;
+      ring.renderOrder = 5;
+      group.add(ring);
+
+      const dotGeometry = new THREE.CircleGeometry(0.18, 24);
+      const dotMaterial = new THREE.MeshBasicMaterial({
+        color: 0x2f6fed,
+        transparent: true,
+        opacity: 0.95,
+        side: THREE.DoubleSide,
+        depthTest: false,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+      });
+      const dot = new THREE.Mesh(dotGeometry, dotMaterial);
+      dot.rotation.x = -Math.PI / 2;
+      dot.renderOrder = 5;
+      group.add(dot);
+
+      const stickGeometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 1.8, 0),
+      ]);
+      const stickMaterial = new THREE.LineBasicMaterial({
+        color: 0x2f6fed,
+        transparent: true,
+        opacity: 0.62,
+        depthTest: false,
+        fog: false,
+        toneMapped: false,
+      });
+      const stick = new THREE.Line(stickGeometry, stickMaterial);
+      stick.renderOrder = 5;
+      group.add(stick);
+
+      group.position.y = 0.8;
+      scene.add(group);
+      return group;
+    }
+
+    /* --------------------------- multi-warhead UI --------------------------- */
+
+    function yieldFromSlider(value) {
+      return Math.pow(10, (Number(value) / 1000) * 3);
+    }
+
+    function sliderFromYield(yieldKt) {
+      return (Math.log10(Math.max(1, yieldKt)) / 3) * 1000;
+    }
+
+    function timeScaleFromSlider(value) {
+      return 0.1 * Math.pow(100, Number(value) / 1000);
+    }
+
+    function formatYield(yieldKt) {
+      return yieldKt >= 10
+        ? `${Math.round(yieldKt)} kt`
+        : `${yieldKt.toFixed(1)} kt`;
+    }
+
+    function formatMeters(meters) {
+      return `${Math.round(meters).toLocaleString("en-US")} m`;
+    }
+
+    function formatTimeScale(scale) {
+      return `${scale < 1 ? scale.toFixed(2) : scale.toFixed(1)}×`;
+    }
+
+    function setBlastStatus(text, mode = "") {
+      blastStatusEl.textContent = text;
+      blastStatusEl.className = `nuke-status${mode ? ` ${mode}` : ""}`;
+    }
+
+    function updateBlastStatus() {
+      if (!simulationDetonated) {
+        setBlastStatus("待引爆");
+      } else if (simulationPaused) {
+        setBlastStatus("已暂停", "paused");
+      } else {
+        setBlastStatus("已引爆", "live");
+      }
+    }
+
+    function updatePlaybackUI() {
+      playbackButton.disabled = !simulationDetonated;
+      playbackButton.textContent = !simulationDetonated
+        ? "暂停"
+        : simulationPaused
+          ? "继续"
+          : "暂停";
+      detonateButton.textContent = simulationDetonated
+        ? "再次引爆"
+        : warheads.length > 1
+          ? "引爆全部"
+          : "引爆";
+    }
+
+    function updateNukeUI() {
+      if (!bomb) return;
+
+      nukeTitle.textContent =
+        `${warheadLabel(bomb)} · ${formatYield(currentYieldKt)} · `
+        + `${currentBurstType === "ground" ? "地爆" : "空爆"}`;
+
+      yieldSlider.value = String(Math.round(sliderFromYield(currentYieldKt)));
+      yieldOutput.textContent = formatYield(currentYieldKt);
+
+      hobSlider.value = String(Math.round(currentHob));
+      hobSlider.disabled = currentBurstType === "ground";
+      hobOutput.textContent = formatMeters(currentHob);
+      optimalHobButton.classList.toggle(
+        "active",
+        autoHob && currentBurstType === "air"
+      );
+      optimalHobButton.disabled = currentBurstType === "ground";
+      hobNote.textContent = currentBurstType === "ground"
+        ? "地爆模式 · 引爆后生成弹坑"
+        : autoHob
+          ? "按 20 psi 最大覆盖"
+          : "手动高度";
+
+      burstButtons.forEach((button) => {
+        button.setAttribute(
+          "aria-pressed",
+          String(button.dataset.burst === currentBurstType)
+        );
+      });
+
+      bombCoordsEl.textContent =
+        `X ${Math.round(bomb.x).toLocaleString("en-US")} m / `
+        + `Z ${Math.round(bomb.z).toLocaleString("en-US")} m`;
+
+      r20El.textContent = formatDistance(bomb.r20);
+      r10El.textContent = formatDistance(bomb.r10);
+      r5El.textContent = formatDistance(bomb.r5);
+      r1El.textContent = formatDistance(bomb.r1);
+      thermalEl.textContent = formatDistance(bomb.thermalRadius);
+      onePsiAreaEl.textContent = Number.isFinite(bomb.onePsiAreaKm2)
+        && bomb.onePsiAreaKm2 > 0
+        ? `${bomb.onePsiAreaKm2.toFixed(1)} km²`
+        : "—";
+      rfireEl.textContent = formatDistance(bomb.fireballRadius);
+
+      timeOutput.textContent = formatTimeScale(simulationTimeScale);
+      updatePlaybackUI();
+      renderWarheadList();
+    }
+
+    function rebuildBombFromState({ reset = true } = {}) {
+      const city = window.__CITY_LAST__;
+      const cityRadius = city?.preset?.radius ?? 3000;
+      const selected = getSelectedWarhead();
+      if (!selected) return;
+
+      selected.x = clamp(selected.x, -cityRadius, cityRadius);
+      selected.z = clamp(selected.z, -cityRadius, cityRadius);
+      if (currentBurstType === "ground") currentHob = 0;
+      currentHob = clamp(currentHob, 0, 6000);
+
+      selected.yieldKt = currentYieldKt;
+      selected.hob = currentHob;
+      selected.burstType = currentBurstType;
+      selected.autoHob = autoHob;
+      selected.updateModel();
+
+      if (reset) resetBlastState();
+      updateNukeUI();
+      updateWarheadMarkers();
+    }
+
+    function clearBlastEffects() {
+      for (const effect of blastEffectsList) effect.clear();
+      blastEffectsList = [];
+    }
+
+    function syncEffectsSelection() {
+      for (const effect of blastEffectsList) {
+        effect.setSelected(effect.bomb.id === selectedWarheadId);
+      }
+      for (const effect of shockwaveEffects) {
+        effect.setSelected(effect.bomb.id === selectedWarheadId);
+      }
+    }
+
+    /* ================================================================== *
+     *  CITY DAMAGE / INSTANT CASUALTY ALLOCATION
+     *
+     *  建筑状态和人口伤亡都在引爆瞬间一次性写入：
+     *  - 20 psi 以上：倒塌
+     *  - 10 psi 以上：多数倒塌
+     *  - 5 psi 以上：大量倒塌
+     *  - 3 psi 以上：结构损伤、部分倒塌
+     *  - 1 psi 以上：轻度损伤
+     *  - 橙色热辐射圈：建筑炭化（即使没有倒塌）
+     *
+     *  人口死亡率采用用户提供的分段表：
+     *    <1 psi: <1%
+     *    1-3 psi: 1-10%
+     *    3-5 psi: 10-50%
+     *    5-8 psi: 50-90%
+     *    8-10 psi: 90-95%（补全空档）
+     *    >10 psi: 95-99%
+     *  受伤率是剩余幸存者中的工程假设比例，不是图中原表数据。
+     * ================================================================== */
+
+    const SHOCK_SPEED_MPS = 500;
+
+    const damageDummy = new THREE.Object3D();
+    const damageColor = new THREE.Color();
+    const damageWhite = new THREE.Color(1, 1, 1);
+    const damageUp = new THREE.Vector3(0, 1, 0);
+    const damageAxis = new THREE.Vector3();
+    const damageBaseQuat = new THREE.Quaternion();
+    const damageTiltQuat = new THREE.Quaternion();
+
+    let activeDamageAnimations = [];
+    let lastDamageUiUpdate = -1;
+
+    function overpressureAtDistance(distance, bombSource) {
+      const levels = [
+        { psi: 20, radius: bombSource.r20 },
+        { psi: 10, radius: bombSource.r10 },
+        { psi: 5, radius: bombSource.r5 },
+        { psi: 1, radius: bombSource.r1 },
+      ]
+        .filter((level) => Number.isFinite(level.radius) && level.radius > 0)
+        .sort((a, b) => a.radius - b.radius);
+
+      if (!levels.length) return 0;
+
+      if (distance <= levels[0].radius) {
+        const t = clamp(distance / levels[0].radius, 0, 1);
+        return levels[0].psi + (1 - t) * 30;
+      }
+
+      for (let i = 0; i < levels.length - 1; i++) {
+        const inner = levels[i];
+        const outer = levels[i + 1];
+        if (distance <= outer.radius) {
+          const t = clamp(
+            (distance - inner.radius) / (outer.radius - inner.radius),
+            0,
+            1
+          );
+          return inner.psi + (outer.psi - inner.psi) * t;
+        }
+      }
+
+      const outer = levels[levels.length - 1];
+      return outer.psi * Math.pow(outer.radius / Math.max(distance, 1), 2);
+    }
+
+    function fatalityRateForOverpressure(pressure) {
+      if (pressure <= 0) return 0;
+      if (pressure < 1) return 0.01 * pressure;
+      if (pressure < 3) return 0.01 + (pressure - 1) / 2 * 0.09;
+      if (pressure < 5) return 0.10 + (pressure - 3) / 2 * 0.40;
+      if (pressure < 8) return 0.50 + (pressure - 5) / 3 * 0.40;
+      if (pressure < 10) return 0.90 + (pressure - 8) / 2 * 0.05;
+      if (pressure < 20) return 0.95 + (pressure - 10) / 10 * 0.04;
+      return 0.99;
+    }
+
+    function injuryRateForOverpressure(pressure) {
+      // 这是“幸存者中受伤比例”的简化假设，不是图中原表数据。
+      if (pressure <= 0) return 0;
+      if (pressure < 1) return 0.04 * pressure;
+      if (pressure < 3) return 0.04 + (pressure - 1) / 2 * 0.26;
+      if (pressure < 5) return 0.30 + (pressure - 3) / 2 * 0.15;
+      if (pressure < 8) return 0.45 - (pressure - 5) / 3 * 0.25;
+      if (pressure < 10) return 0.20 - (pressure - 8) / 2 * 0.08;
+      if (pressure < 20) return 0.12 - (pressure - 10) / 10 * 0.07;
+      return 0.05;
+    }
+
+    function writeBuildingVisual(building, bombSource) {
+      if (!activeCityMesh) return;
+
+      damageDummy.position.set(building.x, 0, building.z);
+      damageBaseQuat.setFromAxisAngle(damageUp, building.rotation || 0);
+
+      if (building.vaporized) {
+        damageDummy.quaternion.identity();
+        damageDummy.scale.set(0, 0, 0);
+      } else {
+        if (building.tilt > 0 && bombSource) {
+          const dx = building.x - bombSource.x;
+          const dz = building.z - bombSource.z;
+          const radial = Math.hypot(dx, dz);
+          if (radial > 0.01) {
+            damageAxis.set(dz / radial, 0, -dx / radial);
+            damageTiltQuat.setFromAxisAngle(damageAxis, building.tilt);
+            damageDummy.quaternion.copy(damageTiltQuat).multiply(damageBaseQuat);
+          } else {
+            damageDummy.quaternion.copy(damageBaseQuat);
+          }
+        } else {
+          damageDummy.quaternion.copy(damageBaseQuat);
+        }
+        damageDummy.scale.set(
+          building.w,
+          building.h * (building.heightScale ?? 1),
+          building.d
+        );
+      }
+
+      damageDummy.updateMatrix();
+      activeCityMesh.setMatrixAt(building.instanceIndex, damageDummy.matrix);
+
+      const charred = clamp(building.char || 0, 0, 1);
+      if (building.vaporized) {
+        damageColor.setRGB(0.04, 0.035, 0.03, THREE.SRGBColorSpace);
+      } else {
+        damageColor.setRGB(
+          1 - 0.52 * charred,
+          1 - 0.56 * charred,
+          1 - 0.58 * charred,
+          THREE.SRGBColorSpace
+        );
+      }
+      activeCityMesh.setColorAt(building.instanceIndex, damageColor);
+    }
+
+    function initializeCityDamage(city, mesh) {
+      activeCity = city;
+      activeCityMesh = mesh;
+      clearShockwave();
+      clearCrater();
+      activeDamageAnimations = [];
+      lastDamageUiUpdate = -1;
+
+      city.buildings.forEach((building, index) => {
+        building.instanceIndex = index;
+        building.damageState = "intact";
+        building.char = 0;
+        building.tilt = 0;
+        building.heightScale = 1;
+        building.vaporized = false;
+        building.dead = 0;
+        building.injured = 0;
+        building.alive = building.population;
+        building.damageProfile = null;
+        building.damageOrigin = null;
+        building.hit = false;
+        building.shockDistance = 0;
+        building.animStart = 0;
+        building.animDuration = 0;
+        mesh.setColorAt(index, damageWhite);
+      });
+
+      city.damageApplied = false;
+      city.damageFinalized = true;
+      city.damageQueue = [];
+      city.damageQueueIndex = 0;
+      city.damageStats = null;
+      city.damageMaxRadius = 0;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    }
+
+    function clearShockwave() {
+      for (const effect of shockwaveEffects) effect.clear();
+      shockwaveEffects = [];
+    }
+
+    function clearCrater() {
+      for (const effect of craterEffects) effect.clear();
+      craterEffects = [];
+    }
+
+    function resetCityDamage() {
+      if (!activeCity || !activeCityMesh) return;
+
+      clearShockwave();
+      clearCrater();
+      activeDamageAnimations = [];
+      lastDamageUiUpdate = -1;
+      activeCity.damageQueue = [];
+      activeCity.damageQueueIndex = 0;
+      activeCity.damageStats = null;
+      activeCity.damageFinalized = true;
+
+      if (!activeCity.damageApplied) return;
+
+      activeCity.buildings.forEach((building) => {
+        building.damageState = "intact";
+        building.char = 0;
+        building.tilt = 0;
+        building.heightScale = 1;
+        building.vaporized = false;
+        building.dead = 0;
+        building.injured = 0;
+        building.alive = building.population;
+        building.damageProfile = null;
+        building.damageOrigin = null;
+        building.hit = false;
+        building.animStart = 0;
+        building.animDuration = 0;
+        writeBuildingVisual(building, null);
+      });
+
+      activeCityMesh.instanceMatrix.needsUpdate = true;
+      activeCityMesh.instanceColor.needsUpdate = true;
+      activeCity.damageApplied = false;
+      renderer.shadowMap.needsUpdate = true;
+      resetPopulation(activeCity.population);
+    }
+
+    const DAMAGE_STATE_RANK = {
+      intact: 0,
+      scorched: 1,
+      damaged: 2,
+      collapsed: 3,
+      vaporized: 4,
+    };
+
+    function evaluateWarheadAgainstBuilding(building, warhead, rng) {
+      const dx = building.x - warhead.x;
+      const dz = building.z - warhead.z;
+      const distance = Math.hypot(dx, dz);
+      const maxRadius = Math.max(
+        warhead.r1,
+        warhead.r5,
+        warhead.thermalRadius,
+        warhead.fireballGroundRadius,
+        warhead.craterRadius
+      );
+      if (distance > maxRadius) {
+        return { affected: false, distance };
+      }
+
+      const pressure = overpressureAtDistance(distance, warhead);
+      const inThermal = distance <= warhead.thermalRadius;
+      const inFireball = warhead.fireballGroundRadius > 0
+        && distance <= warhead.fireballGroundRadius;
+      const inCrater = warhead.craterRadius > 0
+        && distance <= warhead.craterRadius;
+
+      let state = "intact";
+      let tilt = 0;
+      let char = 0;
+      let heightScale = 1;
+
+      if (inFireball || inCrater) {
+        state = "vaporized";
+        char = 1;
+        heightScale = 0;
+      } else {
+        if (pressure >= 10) {
+          state = "collapsed";
+          tilt = 0.20 + rng() * 0.28;
+          char = 0.68 + rng() * 0.12;
+          heightScale = 0.12 + rng() * 0.18;
+        } else if (pressure >= 5) {
+          if (rng() < 0.78) {
+            state = "collapsed";
+            tilt = 0.14 + rng() * 0.28;
+            char = 0.55 + rng() * 0.14;
+            heightScale = 0.18 + rng() * 0.22;
+          } else {
+            state = "damaged";
+            tilt = 0.03 + rng() * 0.07;
+            char = 0.16 + rng() * 0.12;
+          }
+        } else if (pressure >= 3) {
+          const roll = rng();
+          if (roll < 0.18) {
+            state = "collapsed";
+            tilt = 0.12 + rng() * 0.22;
+            char = 0.48 + rng() * 0.14;
+            heightScale = 0.22 + rng() * 0.2;
+          } else if (roll < 0.84) {
+            state = "damaged";
+            tilt = 0.03 + rng() * 0.07;
+            char = 0.12 + rng() * 0.12;
+          }
+        } else if (pressure >= 1) {
+          if (rng() < 0.3) {
+            state = "damaged";
+            tilt = 0.02 + rng() * 0.05;
+            char = 0.07 + rng() * 0.1;
+          }
+        }
+
+        if (inThermal) {
+          char = Math.max(char, 0.42 + rng() * 0.22);
+          if (state === "intact") state = "scorched";
+          if (state === "damaged") char = Math.max(char, 0.5);
+          if (state === "collapsed") char = Math.max(char, 0.58);
+        }
+      }
+
+      const deathRate = state === "vaporized"
+        ? 1
+        : fatalityRateForOverpressure(pressure);
+      const injuryRate = state === "vaporized"
+        ? 0
+        : injuryRateForOverpressure(pressure);
+
+      return {
+        affected: true,
+        warhead,
+        distance,
+        pressure,
+        state,
+        tilt,
+        char,
+        heightScale,
+        deathRate,
+        injuryRate,
+      };
+    }
+
+    function prepareBlastDamage(warheadList) {
+      if (!activeCity || !activeCityMesh) return;
+
+      if (activeCity.damageApplied) {
+        resetCityDamage();
+      } else {
+        resetPopulation(activeCity.population);
+      }
+      clearShockwave();
+      clearCrater();
+      activeDamageAnimations = [];
+      lastDamageUiUpdate = -1;
+
+      const city = activeCity;
+      const ordered = [...warheadList].sort((a, b) => a.id - b.id);
+      const rng = mulberry32(hashString(
+        `${city.seed}:${city.sizeKey}:`
+        + ordered.map((warhead) => (
+          `${warhead.id}:${warhead.x.toFixed(1)}:${warhead.z.toFixed(1)}:`
+          + `${warhead.yieldKt}:${warhead.hob.toFixed(1)}:${warhead.burstType}`
+        )).join("|")
+        + `:multi:v1`
+      ));
+
+      city.damageApplied = true;
+      city.damageFinalized = false;
+      city.damageQueue = [];
+      city.damageQueueIndex = 0;
+      city.damageStats = {
+        total: city.population,
+        dead: 0,
+        injured: 0,
+      };
+
+      let fireballDead = 0;
+      let fireballInjured = 0;
+
+      city.buildings.forEach((building) => {
+        building.dead = 0;
+        building.injured = 0;
+        building.alive = building.population;
+        building.char = 0;
+        building.tilt = 0;
+        building.heightScale = 1;
+        building.vaporized = false;
+        building.damageState = "intact";
+        building.damageProfile = null;
+        building.damageOrigin = null;
+        building.hit = false;
+        building.shockDistance = Infinity;
+
+        let best = null;
+        let bestRank = -1;
+        let maxDeathRate = 0;
+        let maxInjuryRate = 0;
+        let minShockDistance = Infinity;
+        let vaporized = false;
+
+        for (const warhead of ordered) {
+          const attempt = evaluateWarheadAgainstBuilding(
+            building,
+            warhead,
+            rng
+          );
+          if (!attempt.affected) continue;
+
+          minShockDistance = Math.min(minShockDistance, attempt.distance);
+          maxDeathRate = Math.max(maxDeathRate, attempt.deathRate);
+          maxInjuryRate = Math.max(maxInjuryRate, attempt.injuryRate);
+
+          if (attempt.state === "vaporized") {
+            vaporized = true;
+            best = attempt;
+            bestRank = DAMAGE_STATE_RANK.vaporized;
+            break;
+          }
+
+          const rank = DAMAGE_STATE_RANK[attempt.state] || 0;
+          if (rank > bestRank
+            || (rank === bestRank && attempt.char > (best?.char || 0))) {
+            best = attempt;
+            bestRank = rank;
+          }
+        }
+
+        if (!best) return;
+
+        building.shockDistance = minShockDistance;
+
+        if (vaporized) {
+          const population = Math.max(0, building.population);
+          building.hit = true;
+          building.damageState = "vaporized";
+          building.vaporized = true;
+          building.char = 1;
+          building.tilt = 0;
+          building.heightScale = 0;
+          building.dead = population;
+          building.injured = 0;
+          building.alive = 0;
+          building.damageOrigin = {
+            x: best.warhead.x,
+            z: best.warhead.z,
+          };
+          fireballDead += population;
+          writeBuildingVisual(building, building.damageOrigin);
+          return;
+        }
+
+        const population = Math.max(0, building.population);
+        const pendingDead = Math.round(population * maxDeathRate);
+        const pendingInjured = Math.round(
+          Math.max(0, population - pendingDead) * maxInjuryRate
+        );
+        const duration = best.state === "collapsed"
+          ? 0.62 + rng() * 0.55
+          : best.state === "damaged"
+            ? 0.42 + rng() * 0.35
+            : 0.58 + rng() * 0.5;
+
+        building.damageOrigin = {
+          x: best.warhead.x,
+          z: best.warhead.z,
+        };
+        building.damageProfile = {
+          state: best.state,
+          tilt: best.tilt,
+          char: best.char,
+          heightScale: best.heightScale,
+          dead: pendingDead,
+          injured: pendingInjured,
+          delay: rng() * 0.07,
+          duration,
+        };
+        city.damageQueue.push(building);
+      });
+
+      city.damageQueue.sort((a, b) => a.shockDistance - b.shockDistance);
+      city.damageStats.dead = fireballDead;
+      city.damageStats.injured = fireballInjured;
+      setCasualties({
+        alive: city.population - fireballDead - fireballInjured,
+        injured: fireballInjured,
+        dead: fireballDead,
+      });
+
+      if (fireballDead > 0) {
+        renderer.shadowMap.needsUpdate = true;
+      }
+
+      if (city.damageQueue.length === 0) {
+        city.damageFinalized = true;
+        renderer.shadowMap.needsUpdate = true;
+      }
+    }
+
+    function activateBuildingDamage(building, time) {
+      const profile = building.damageProfile;
+      if (!profile) return;
+
+      building.hit = true;
+      building.damageState = profile.state;
+      building.dead = profile.dead;
+      building.injured = profile.injured;
+      building.alive = building.population - profile.dead - profile.injured;
+
+      const needsVisual = profile.state !== "intact"
+        || profile.char > 0.001
+        || profile.tilt > 0.001
+        || profile.heightScale < 0.999;
+
+      if (!needsVisual) return;
+
+      building.char = 0;
+      building.tilt = 0;
+      building.heightScale = 1;
+      building.animStart = time + profile.delay;
+      building.animDuration = profile.duration;
+      activeDamageAnimations.push(building);
+    }
+
+    function updateShockwaveDamage(time) {
+      if (!activeCity || !activeCity.damageApplied) return;
+
+      const queue = activeCity.damageQueue;
+      if (!queue) return;
+
+      const radius = time * SHOCK_SPEED_MPS;
+
+      let hitsThisFrame = 0;
+      while (
+        activeCity.damageQueueIndex < queue.length
+        && queue[activeCity.damageQueueIndex].shockDistance <= radius
+      ) {
+        const building = queue[activeCity.damageQueueIndex++];
+        if (building.hit) continue;
+        activateBuildingDamage(building, time);
+        activeCity.damageStats.dead += building.damageProfile.dead;
+        activeCity.damageStats.injured += building.damageProfile.injured;
+        hitsThisFrame++;
+      }
+
+      if (activeDamageAnimations.length > 0) {
+        const stillAnimating = [];
+        for (const building of activeDamageAnimations) {
+          if (time < building.animStart) {
+            stillAnimating.push(building);
+            continue;
+          }
+
+          const profile = building.damageProfile;
+          const progress = clamp(
+            (time - building.animStart) / building.animDuration,
+            0,
+            1
+          );
+          const ease = 1 - Math.pow(1 - progress, 3);
+          building.char = profile.char * ease;
+          building.tilt = profile.tilt * ease;
+          building.heightScale =
+            1 + (profile.heightScale - 1) * ease;
+          writeBuildingVisual(
+            building,
+            building.damageOrigin || null
+          );
+
+          if (progress < 1) stillAnimating.push(building);
+        }
+        activeDamageAnimations = stillAnimating;
+        activeCityMesh.instanceMatrix.needsUpdate = true;
+        activeCityMesh.instanceColor.needsUpdate = true;
+      }
+
+      if (
+        hitsThisFrame > 0
+        && (time - lastDamageUiUpdate > 0.08 || time < 0.1)
+      ) {
+        lastDamageUiUpdate = time;
+        setCasualties({
+          alive: activeCity.population
+            - activeCity.damageStats.dead
+            - activeCity.damageStats.injured,
+          injured: activeCity.damageStats.injured,
+          dead: activeCity.damageStats.dead,
+        });
+      }
+
+      if (
+        activeCity.damageQueueIndex >= queue.length
+        && activeDamageAnimations.length === 0
+        && !activeCity.damageFinalized
+      ) {
+        activeCity.damageFinalized = true;
+        renderer.shadowMap.needsUpdate = true;
+        setCasualties({
+          alive: activeCity.population
+            - activeCity.damageStats.dead
+            - activeCity.damageStats.injured,
+          injured: activeCity.damageStats.injured,
+          dead: activeCity.damageStats.dead,
+        });
+      }
+    }
+
+    function resetBlastState() {
+      clearBlastEffects();
+      clearShockwave();
+      clearCrater();
+      resetCityDamage();
+      simulationDetonated = false;
+      simulationPaused = true;
+      simulationTime = 0;
+      updateWarheadMarkers();
+      effectTimeEl.textContent = "T+0.0 s";
+      updateBlastStatus();
+      updatePlaybackUI();
+    }
+
+    function detonateBomb() {
+      if (!warheads.length) return;
+
+      clearBlastEffects();
+      clearShockwave();
+      clearCrater();
+      simulationTime = 0;
+      simulationDetonated = true;
+      simulationPaused = false;
+      updateWarheadMarkers();
+
+      blastEffectsList = warheads.map(
+        (warhead) => new BlastEffects(
+          warhead,
+          warhead.id === selectedWarheadId
+        )
+      );
+      for (const effect of blastEffectsList) effect.update(0);
+
+      prepareBlastDamage(warheads);
+      shockwaveEffects = warheads.map(
+        (warhead) => new ShockwaveEffect(
+          warhead,
+          warhead.id === selectedWarheadId
+        )
+      );
+      craterEffects = warheads
+        .filter((warhead) => warhead.burstType === "ground"
+          && warhead.craterRadius > 0)
+        .map((warhead) => new CraterEffect(warhead));
+
+      updateBlastStatus();
+      updatePlaybackUI();
+      effectTimeEl.textContent = "T+0.0 s";
+      fitBlastView();
+
+      if (window.innerWidth <= 980) {
+        setNukePanelOpen(false);
+      }
+    }
+
+    function togglePlayback() {
+      if (!simulationDetonated) return;
+      simulationPaused = !simulationPaused;
+      updateBlastStatus();
+      updatePlaybackUI();
+    }
+
+    function fitBlastView() {
+      if (!warheads.length) return;
+
+      const cityRadius = window.__CITY_LAST__?.preset?.radius ?? 3000;
+      let centerX = 0;
+      let centerZ = 0;
+      for (const warhead of warheads) {
+        centerX += warhead.x;
+        centerZ += warhead.z;
+      }
+      centerX /= warheads.length;
+      centerZ /= warheads.length;
+
+      let focusRadius = 0;
+      for (const warhead of warheads) {
+        const offset = Math.hypot(
+          warhead.x - centerX,
+          warhead.z - centerZ
+        );
+        const ownRadius = Math.max(
+          warhead.r1 * 1.16 || 0,
+          warhead.thermalRadius * 1.12 || 0,
+          warhead.r5 * 1.45 || 0,
+          warhead.fireballRadius * 2.4
+        );
+        focusRadius = Math.max(focusRadius, offset + ownRadius);
+      }
+      focusRadius = Math.max(
+        focusRadius,
+        Math.min(cityRadius * 0.55, 1800)
+      );
+
+      const verticalHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+      const horizontalHalf = verticalHalf * camera.aspect;
+      const distance = (focusRadius / horizontalHalf) * 1.28;
+      const elevation = THREE.MathUtils.degToRad(
+        window.innerWidth < 700 ? 40 : 18
+      );
+      const azimuth = THREE.MathUtils.degToRad(38);
+      const horizontal = Math.cos(elevation) * distance;
+
+      camera.position.set(
+        centerX + Math.sin(azimuth) * horizontal,
+        Math.sin(elevation) * distance + 20,
+        centerZ + Math.cos(azimuth) * horizontal
+      );
+      controls.target.set(centerX, 0, centerZ);
+      controls.maxDistance = Math.max(controls.maxDistance, distance * 2.8);
+      camera.far = Math.max(camera.far, distance * 5);
+      camera.updateProjectionMatrix();
+
+      // 拉远后如果仍沿用城市近景的雾，整座城市会被雾吃掉。
+      // 按当前相机距离重新设定雾的可见范围。
+      scene.fog.near = Math.max(scene.fog.near, distance * 0.95);
+      scene.fog.far = Math.max(scene.fog.far, distance * 3.5);
+
+      controls.update();
+    }
+
+    function setNukePanelOpen(open) {
+      nukePanel.classList.toggle("open", open);
+      nukeToggle.setAttribute("aria-expanded", String(open));
+    }
+
+    function handleYieldInput() {
+      currentYieldKt = yieldFromSlider(yieldSlider.value);
+      if (autoHob && currentBurstType === "air") {
+        currentHob = optimalHobForYield(currentYieldKt);
+      }
+      rebuildBombFromState({ reset: true });
+    }
+
+    function handleHobInput() {
+      currentHob = clamp(Number(hobSlider.value), 0, 6000);
+      autoHob = false;
+      currentBurstType = currentHob <= 0 ? "ground" : "air";
+      rebuildBombFromState({ reset: true });
+    }
+
+    function handleOptimalHob() {
+      currentBurstType = "air";
+      autoHob = true;
+      currentHob = optimalHobForYield(currentYieldKt);
+      rebuildBombFromState({ reset: true });
+    }
+
+    function handleBurstInput(event) {
+      const nextType = event.currentTarget.dataset.burst;
+      currentBurstType = nextType;
+
+      if (nextType === "ground") {
+        autoHob = false;
+        currentHob = 0;
+      } else {
+        autoHob = true;
+        currentHob = optimalHobForYield(currentYieldKt);
+      }
+
+      rebuildBombFromState({ reset: true });
+    }
+
+    function handleCanvasPointerDown(event) {
+      if (event.button !== 0) return;
+      placementPointer = { x: event.clientX, y: event.clientY };
+    }
+
+    function findWarheadAtScreen(clientX, clientY) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      const point = new THREE.Vector3();
+      let closest = null;
+      let closestDistance = 18;
+
+      for (const warhead of warheads) {
+        point.set(warhead.x, 4, warhead.z).project(camera);
+        if (point.z > 1) continue;
+        const screenX = rect.left + (point.x * 0.5 + 0.5) * rect.width;
+        const screenY = rect.top + (-point.y * 0.5 + 0.5) * rect.height;
+        const distance = Math.hypot(screenX - clientX, screenY - clientY);
+        if (distance < closestDistance) {
+          closest = warhead;
+          closestDistance = distance;
+        }
+      }
+      return closest;
+    }
+
+    function refreshWarheadScenario() {
+      syncSelectedState();
+      resetBlastState();
+      updateNukeUI();
+      updateWarheadMarkers();
+      renderWarheadList();
+      syncEffectsSelection();
+    }
+
+    function placeWarheadAt(x, z) {
+      const cityRadius = window.__CITY_LAST__?.preset?.radius ?? 3000;
+      const clampedX = clamp(x, -cityRadius, cityRadius);
+      const clampedZ = clamp(z, -cityRadius, cityRadius);
+
+      if (warheads.length < maxWarheads) {
+        const template = currentWarheadTemplate();
+        const warhead = addWarhead({
+          x: clampedX,
+          z: clampedZ,
+          yieldKt: template.yieldKt,
+          hob: template.hob,
+          burstType: template.burstType,
+          autoHobMode: template.autoHob,
+          select: true,
+        });
+        if (!warhead) return;
+      } else {
+        const selected = getSelectedWarhead();
+        if (!selected) return;
+        selected.x = clampedX;
+        selected.z = clampedZ;
+        selected.updateModel();
+      }
+      refreshWarheadScenario();
+    }
+
+    function removeLastWarhead() {
+      if (warheads.length <= 1) return;
+      removeWarheadById(warheads[warheads.length - 1].id);
+    }
+
+    function handleCanvasPointerUp(event) {
+      if (!placementPointer || event.button !== 0) {
+        placementPointer = null;
+        return;
+      }
+
+      const moved = Math.hypot(
+        event.clientX - placementPointer.x,
+        event.clientY - placementPointer.y
+      );
+      placementPointer = null;
+      if (moved > 6) return;
+
+      const warhead = findWarheadAtScreen(event.clientX, event.clientY);
+      if (warhead) {
+        setSelectedWarhead(warhead.id);
+        return;
+      }
+
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(pointer, camera);
+      const hit = raycaster.intersectObject(ground, false)[0];
+      if (!hit) return;
+
+      placeWarheadAt(hit.point.x, hit.point.z);
+    }
+
+    function handleCanvasRightClick(event) {
+      const warhead = findWarheadAtScreen(event.clientX, event.clientY);
+      if (warhead) {
+        removeWarheadById(warhead.id);
+      } else {
+        removeLastWarhead();
+      }
+    }
+
+    function initializeNuclearSimulation() {
+      currentYieldKt = 100;
+      currentBurstType = "air";
+      autoHob = true;
+      currentHob = optimalHobForYield(currentYieldKt);
+      simulationTimeScale = 1;
+      maxWarheads = window.innerWidth <= 760 ? 3 : 6;
+      warheads = [];
+      selectedWarheadId = null;
+      nextWarheadId = 1;
+
+      addWarhead({
+        x: 0,
+        z: 0,
+        yieldKt: currentYieldKt,
+        hob: currentHob,
+        burstType: "air",
+        autoHobMode: true,
+        select: true,
+      });
+      simulationReady = true;
+
+      updateNukeUI();
+      updateWarheadMarkers();
+      renderWarheadList();
+      updateBlastStatus();
+      updatePlaybackUI();
+      effectTimeEl.textContent = "T+0.0 s";
+    }
+
+    function resetScenarioForCity(city) {
+      if (!simulationReady) return;
+
+      maxWarheads = window.innerWidth <= 760 ? 3 : 6;
+      while (warheads.length > maxWarheads) {
+        const removed = warheads.pop();
+        removeWarheadMarker(removed);
+      }
+      if (!warheads.length) {
+        addWarhead({
+          x: 0,
+          z: 0,
+          yieldKt: 100,
+          hob: optimalHobForYield(100),
+          burstType: "air",
+          autoHobMode: true,
+          select: true,
+        });
+      }
+
+      const radius = city.preset.radius;
+      for (const warhead of warheads) {
+        warhead.x = clamp(warhead.x, -radius, radius);
+        warhead.z = clamp(warhead.z, -radius, radius);
+        warhead.updateModel();
+      }
+
+      if (!warheads.some((warhead) => warhead.id === selectedWarheadId)) {
+        selectedWarheadId = warheads[0].id;
+      }
+      syncSelectedState();
+      resetBlastState();
+      updateNukeUI();
+      updateWarheadMarkers();
+      renderWarheadList();
+      syncEffectsSelection();
+    }
+
+    /* -------------------------------- events ------------------------------ */
+
+    const PANEL_MARGIN = 10;
+    const panelDrag = {
+      active: false,
+      pointerId: null,
+      startX: 0,
+      startY: 0,
+      baseX: 0,
+      baseY: 0,
+      offsetX: 0,
+      offsetY: 0,
+    };
+
+    function applyPopulationPanelOffset() {
+      populationPanel.style.transform =
+        `translate3d(${panelDrag.offsetX}px, ${panelDrag.offsetY}px, 0)`;
+    }
+
+    function clampPopulationPanel() {
+      const rect = populationPanel.getBoundingClientRect();
+      let adjustX = 0;
+      let adjustY = 0;
+
+      if (rect.left < PANEL_MARGIN) {
+        adjustX = PANEL_MARGIN - rect.left;
+      } else if (rect.right > window.innerWidth - PANEL_MARGIN) {
+        adjustX = window.innerWidth - PANEL_MARGIN - rect.right;
+      }
+
+      if (rect.top < PANEL_MARGIN) {
+        adjustY = PANEL_MARGIN - rect.top;
+      } else if (rect.bottom > window.innerHeight - PANEL_MARGIN) {
+        adjustY = window.innerHeight - PANEL_MARGIN - rect.bottom;
+      }
+
+      if (adjustX !== 0 || adjustY !== 0) {
+        panelDrag.offsetX += adjustX;
+        panelDrag.offsetY += adjustY;
+        applyPopulationPanelOffset();
+      }
+    }
+
+    function endPopulationPanelDrag(event) {
+      if (!panelDrag.active) return;
+      if (event && event.pointerId !== panelDrag.pointerId) return;
+
+      if (populationPanel.hasPointerCapture?.(panelDrag.pointerId)) {
+        populationPanel.releasePointerCapture(panelDrag.pointerId);
+      }
+
+      panelDrag.active = false;
+      panelDrag.pointerId = null;
+      populationPanel.classList.remove("dragging");
+    }
+
+    populationPanel.addEventListener("pointerdown", (event) => {
+      if (panelDrag.active) return;
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      panelDrag.active = true;
+      panelDrag.pointerId = event.pointerId;
+      panelDrag.startX = event.clientX;
+      panelDrag.startY = event.clientY;
+      panelDrag.baseX = panelDrag.offsetX;
+      panelDrag.baseY = panelDrag.offsetY;
+
+      populationPanel.setPointerCapture(event.pointerId);
+      populationPanel.classList.add("dragging");
+    });
+
+    populationPanel.addEventListener("pointermove", (event) => {
+      if (!panelDrag.active || event.pointerId !== panelDrag.pointerId) return;
+
+      event.preventDefault();
+      panelDrag.offsetX = panelDrag.baseX + event.clientX - panelDrag.startX;
+      panelDrag.offsetY = panelDrag.baseY + event.clientY - panelDrag.startY;
+      applyPopulationPanelOffset();
+      clampPopulationPanel();
+    });
+
+    populationPanel.addEventListener("pointerup", endPopulationPanelDrag);
+    populationPanel.addEventListener("pointercancel", endPopulationPanelDrag);
+    populationPanel.addEventListener("lostpointercapture", endPopulationPanelDrag);
+
+    populationPanel.addEventListener("dblclick", () => {
+      panelDrag.offsetX = 0;
+      panelDrag.offsetY = 0;
+      applyPopulationPanelOffset();
+    });
+
+    nukeToggle.addEventListener("click", () => {
+      setNukePanelOpen(!nukePanel.classList.contains("open"));
+    });
+
+    nukeClose.addEventListener("click", () => setNukePanelOpen(false));
+
+    yieldSlider.addEventListener("input", handleYieldInput);
+    hobSlider.addEventListener("input", handleHobInput);
+    optimalHobButton.addEventListener("click", handleOptimalHob);
+
+    burstButtons.forEach((button) => {
+      button.addEventListener("click", handleBurstInput);
+    });
+
+    detonateButton.addEventListener("click", detonateBomb);
+    resetBlastButton.addEventListener("click", resetBlastState);
+    addWarheadButton.addEventListener("click", addWarheadNearCenter);
+    mirvArrayButton.addEventListener("click", makeMirvArray);
+    fitBlastButton.addEventListener("click", fitBlastView);
+    playbackButton.addEventListener("click", togglePlayback);
+
+    timeSlider.addEventListener("input", () => {
+      simulationTimeScale = timeScaleFromSlider(timeSlider.value);
+      timeOutput.textContent = formatTimeScale(simulationTimeScale);
+    });
+
+    canvas.addEventListener("pointerdown", handleCanvasPointerDown);
+    canvas.addEventListener("pointerup", handleCanvasPointerUp);
+    canvas.addEventListener("pointercancel", () => { placementPointer = null; });
+    canvas.addEventListener("pointerleave", () => { placementPointer = null; });
+    canvas.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      handleCanvasRightClick(event);
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") setNukePanelOpen(false);
+    });
+
+    function reroll(fitCamera = false) {
+      setCity(currentSize, randomSeed(), fitCamera);
+    }
+
+    sizeButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const nextSize = button.dataset.size;
+        if (nextSize === currentSize) return;
+        setCity(nextSize, randomSeed(), true);
+      });
+    });
+
+    regenerateEl.addEventListener("click", () => reroll(false));
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key.toLowerCase() !== "r") return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const tag = event.target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      event.preventDefault();
+      reroll(false);
+    });
+
+    function onResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      labelRenderer.setSize(window.innerWidth, window.innerHeight);
+      requestAnimationFrame(clampPopulationPanel);
+    }
+
+    window.addEventListener("resize", onResize);
+
+    // Small debug surface; useful when inspecting a generated layout or
+    // wiring the next simulation stage to the same scene.
+    window.__CITY_APP__ = {
+      scene,
+      camera,
+      controls,
+      renderer,
+      keyLight,
+      hemi,
+      setCity,
+      reroll,
+      setCasualties,
+      getPopulation: () => ({ ...populationState }),
+      getCity: () => window.__CITY_LAST__,
+      getBomb: () => bomb?.summary,
+      getWarheads: () => warheads.map((warhead) => ({
+        ...warhead.summary,
+        id: warhead.id,
+        autoHob: warhead.autoHob,
+      })),
+      getSelectedWarheadId: () => selectedWarheadId,
+      selectWarhead: setSelectedWarhead,
+      addWarheadNearCenter,
+      makeMirvArray,
+      placeWarheadAt,
+      removeWarheadById,
+      getEffects: () => ({
+        blasts: blastEffectsList.length,
+        shockwaves: shockwaveEffects.length,
+        craters: craterEffects.length,
+      }),
+      getSimulation: () => ({
+        detonated: simulationDetonated,
+        paused: simulationPaused,
+        time: simulationTime,
+        timeScale: simulationTimeScale,
+      }),
+      detonate: detonateBomb,
+      fitBlastView,
+    };
+
+    /* -------------------------------- render ------------------------------ */
+
+    function animate(timestamp = performance.now()) {
+      requestAnimationFrame(animate);
+
+      if (lastFrameTimestamp == null) lastFrameTimestamp = timestamp;
+      const rawDelta = Math.min(
+        0.25,
+        Math.max(0, (timestamp - lastFrameTimestamp) / 1000)
+      );
+      lastFrameTimestamp = timestamp;
+
+      if (simulationDetonated && !simulationPaused) {
+        simulationTime += rawDelta * simulationTimeScale;
+      }
+
+      for (const effect of blastEffectsList) {
+        effect.update(simulationTime);
+      }
+
+      if (simulationDetonated) {
+        updateShockwaveDamage(simulationTime);
+        for (let i = shockwaveEffects.length - 1; i >= 0; i--) {
+          const effect = shockwaveEffects[i];
+          effect.update(simulationTime);
+          if (simulationTime > effect.maxTime + 1.6) {
+            effect.clear();
+            shockwaveEffects.splice(i, 1);
+          }
+        }
+      }
+
+      effectTimeEl.textContent = `T+${simulationTime.toFixed(1)} s`;
+      controls.update();
+      renderer.render(scene, camera);
+      labelRenderer.render(scene, camera);
+    }
+
+    function boot() {
+      const params = new URLSearchParams(window.location.search);
+      const requestedSize = params.get("size");
+      const initialSize = CITY_PRESETS[requestedSize] ? requestedSize : "medium";
+      const initialSeed = params.get("seed") || randomSeed();
+
+      setCity(initialSize, initialSeed, true);
+      initializeNuclearSimulation();
+      renderer.render(scene, camera);
+
+      requestAnimationFrame(() => {
+        loadingEl.classList.add("hidden");
+        animate(performance.now());
+      });
+    }
+
+    try {
+      boot();
+    } catch (error) {
+      console.error(error);
+      loadingEl.classList.add("hidden");
+      errorEl.style.display = "flex";
+      errorEl.textContent = `CITY GENERATION FAILED\n${error?.message || error}`;
+    }
+  </script>
+</body>
+</html>
